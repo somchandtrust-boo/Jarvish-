@@ -1,6 +1,6 @@
 /* =========================================================
-   JARVISH — AI VOICE ASSISTANT
-   script.js
+   JARVISH VOICE SYSTEM V2
+   FINAL WORKING VERSION
    ========================================================= */
 
 "use strict";
@@ -42,12 +42,11 @@ const JARVISH_CONFIG = {
         facebook:
             "https://www.facebook.com/"
     }
-
 };
 
 
 /* =========================================================
-   GLOBAL STATE
+   STATE
    ========================================================= */
 
 const state = {
@@ -55,35 +54,38 @@ const state = {
     language:
         JARVISH_CONFIG.defaultLanguage,
 
-    listening:false,
+    listening: false,
 
-    speaking:false,
+    speaking: false,
 
-    recognition:null,
-
-    speechSupported:
-        "speechSynthesis" in window,
+    recognition: null,
 
     recognitionSupported:
         "SpeechRecognition" in window ||
         "webkitSpeechRecognition" in window,
 
-    cameraStream:null,
+    speechSupported:
+        "speechSynthesis" in window,
 
-    cameraTrack:null,
+    recognitionStarting: false,
 
-    flashlight:false,
+    manualStop: false,
 
-    compassActive:false,
+    cameraStream: null,
 
-    compassHandler:null,
+    cameraTrack: null,
 
-    currentModule:null,
+    flashlight: false,
 
-    weatherLoading:false,
+    compassActive: false,
 
-    history:[]
+    compassHandler: null,
 
+    currentModule: null,
+
+    weatherLoading: false,
+
+    history: []
 };
 
 
@@ -177,7 +179,7 @@ document.addEventListener(
 );
 
 
-function initializeJarvish(){
+function initializeJarvish() {
 
     setupClock();
 
@@ -195,43 +197,14 @@ function initializeJarvish(){
 
     loadWeather();
 
-    speakWelcome();
+    setTimeout(
+        speakWelcome,
+        900
+    );
 
-}
-
-
-/* =========================================================
-   SYSTEM STATUS
-   ========================================================= */
-
-function updateSystemStatus(){
-
-    if(el.aiCoreStatus){
-        el.aiCoreStatus.textContent =
-            "READY";
-    }
-
-    if(el.systemAI){
-        el.systemAI.textContent =
-            "READY";
-    }
-
-    if(el.systemVoice){
-
-        el.systemVoice.textContent =
-            state.speechSupported
-                ? "READY"
-                : "LIMITED";
-    }
-
-    if(el.micStatus){
-
-        el.micStatus.textContent =
-            state.recognitionSupported
-                ? "STANDBY"
-                : "UNAVAILABLE";
-    }
-
+    console.log(
+        "JARVISH initialized successfully."
+    );
 }
 
 
@@ -239,7 +212,26 @@ function updateSystemStatus(){
    CLOCK
    ========================================================= */
 
-function setupClock(){
+function setupClock() {
+
+    function updateClock() {
+
+        const now =
+            new Date();
+
+        if (el.currentTime) {
+
+            el.currentTime.textContent =
+                now.toLocaleTimeString(
+                    state.language,
+                    {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit"
+                    }
+                );
+        }
+    }
 
     updateClock();
 
@@ -247,171 +239,157 @@ function setupClock(){
         updateClock,
         1000
     );
-
-}
-
-
-function updateClock(){
-
-    if(!el.currentTime){
-        return;
-    }
-
-    const now =
-        new Date();
-
-    el.currentTime.textContent =
-        now.toLocaleTimeString(
-            [],
-            {
-                hour:"2-digit",
-                minute:"2-digit",
-                second:"2-digit"
-            }
-        );
-
 }
 
 
 /* =========================================================
-   BUTTON SETUP
+   BUTTONS
    ========================================================= */
 
-function setupButtons(){
+function setupButtons() {
 
-    if(el.micButton){
+    if (el.micButton) {
 
         el.micButton.addEventListener(
             "click",
             toggleListening
         );
-
     }
 
+    if (el.aiCore) {
 
-    document
-        .querySelectorAll(
-            ".command-button, .quick-button"
-        )
-        .forEach(button => {
+        el.aiCore.addEventListener(
+            "click",
+            toggleListening
+        );
+    }
 
-            button.addEventListener(
-                "click",
-                () => {
-
-                    const command =
-                        button.dataset.command;
-
-                    if(command){
-                        executeCommand(command);
-                    }
-
-                }
-            );
-
-        });
-
-
-    if(el.closeModule){
+    if (el.closeModule) {
 
         el.closeModule.addEventListener(
             "click",
             closeModule
         );
-
     }
 
-
-    if(el.moduleOverlay){
+    if (el.moduleOverlay) {
 
         el.moduleOverlay.addEventListener(
             "click",
-            event => {
+            function (event) {
 
-                if(
+                if (
                     event.target ===
                     el.moduleOverlay
-                ){
-
+                ) {
                     closeModule();
-
                 }
-
             }
         );
-
     }
 
-
-    if(el.clearHistory){
+    if (el.clearHistory) {
 
         el.clearHistory.addEventListener(
             "click",
-            clearCommandHistory
+            function () {
+
+                state.history = [];
+
+                localStorage.removeItem(
+                    "jarvish_history"
+                );
+
+                renderHistory();
+
+                speak(
+                    getLanguageText(
+                        "historyCleared"
+                    )
+                );
+            }
         );
-
     }
-
 }
 
 
 /* =========================================================
-   LANGUAGE
+   LANGUAGE BUTTONS
    ========================================================= */
 
-function setupLanguageButtons(){
+function setupLanguageButtons() {
 
-    document
-        .querySelectorAll(
-            ".language-button"
-        )
-        .forEach(button => {
+    const buttons =
+        document.querySelectorAll(
+            "[data-lang]"
+        );
+
+    buttons.forEach(
+        button => {
 
             button.addEventListener(
                 "click",
-                () => {
+                function () {
 
-                    const language =
-                        button.dataset.language;
+                    const lang =
+                        button.dataset.lang;
 
-                    if(language){
-
-                        state.language =
-                            language;
-
-                        document
-                            .querySelectorAll(
-                                ".language-button"
-                            )
-                            .forEach(btn =>
-                                btn.classList.remove(
-                                    "active"
-                                )
-                            );
-
-                        button.classList.add(
-                            "active"
-                        );
-
-                        showNotification(
-                            getText(
-                                "languageChanged"
-                            )
-                        );
-
-                        speak(
-                            getText(
-                                "languageChanged"
-                            )
-                        );
-
+                    if (!lang) {
+                        return;
                     }
 
+                    state.language =
+                        lang;
+
+                    if (
+                        state.recognition
+                    ) {
+
+                        state.recognition.lang =
+                            state.language;
+                    }
+
+                    buttons.forEach(
+                        item =>
+                            item.classList.remove(
+                                "active"
+                            )
+                    );
+
+                    button.classList.add(
+                        "active"
+                    );
+
+                    const languageName =
+                        getLanguageName(lang);
+
+                    speak(
+                        languageName +
+                        " " +
+                        getLanguageText(
+                            "languageChanged"
+                        )
+                    );
+
+                    updateSystemStatus();
                 }
             );
+        }
+    );
+}
 
-        });
 
+function getLanguageName(lang) {
+
+    if (lang === "hi-IN") {
+        return "Hindi";
+    }
+
+    if (lang === "gu-IN") {
+        return "Gujarati";
+    }
+
+    return "English";
 }
 
 
@@ -419,120 +397,290 @@ function setupLanguageButtons(){
    SPEECH RECOGNITION
    ========================================================= */
 
-function setupSpeechRecognition(){
+function setupSpeechRecognition() {
 
-    if(!state.recognitionSupported){
+    if (!state.recognitionSupported) {
+
+        if (el.micStatus) {
+            el.micStatus.textContent =
+                "VOICE UNSUPPORTED";
+        }
+
+        if (el.systemVoice) {
+            el.systemVoice.textContent =
+                "UNSUPPORTED";
+        }
+
+        console.warn(
+            "Speech Recognition is not supported."
+        );
+
         return;
     }
 
-    const SpeechRecognition =
-        window.SpeechRecognition ||
-        window.webkitSpeechRecognition;
+    try {
 
-    state.recognition =
-        new SpeechRecognition();
+        const SpeechRecognition =
+            window.SpeechRecognition ||
+            window.webkitSpeechRecognition;
 
-    state.recognition.continuous =
-        false;
+        state.recognition =
+            new SpeechRecognition();
 
-    state.recognition.interimResults =
-        false;
+        state.recognition.continuous =
+            false;
 
-    state.recognition.maxAlternatives =
-        1;
+        state.recognition.interimResults =
+            false;
 
-    state.recognition.lang =
-        state.language;
+        state.recognition.maxAlternatives =
+            1;
 
-
-    state.recognition.onstart =
-        () => {
-
-            state.listening = true;
-
-            updateListeningUI(true);
-
-            el.micStatus &&
-                (el.micStatus.textContent =
-                    "LISTENING");
-
-            setCoreStatus(
-                getText("listening")
-            );
-
-        };
+        state.recognition.lang =
+            state.language;
 
 
-    state.recognition.onresult =
-        event => {
+        /* ================================================
+           ON START
+           ================================================ */
 
-            const transcript =
-                event.results[
-                    event.results.length - 1
-                ][0].transcript.trim();
+        state.recognition.onstart =
+            function () {
 
-            if(!transcript){
-                return;
-            }
+                state.listening =
+                    true;
 
-            processVoiceCommand(
-                transcript
-            );
+                state.recognitionStarting =
+                    false;
 
-        };
+                state.manualStop =
+                    false;
 
+                updateListeningUI(true);
 
-    state.recognition.onerror =
-        event => {
-
-            console.warn(
-                "JARVISH Voice Error:",
-                event.error
-            );
-
-            state.listening = false;
-
-            updateListeningUI(false);
-
-            if(el.micStatus){
-                el.micStatus.textContent =
-                    "STANDBY";
-            }
-
-            if(
-                event.error ===
-                "not-allowed"
-            ){
-
-                speak(
-                    getText(
-                        "microphoneDenied"
+                setCoreStatus(
+                    getLanguageText(
+                        "listening"
                     )
                 );
 
-            }
+                console.log(
+                    "JARVISH voice recognition started."
+                );
+            };
 
-        };
+
+        /* ================================================
+           ON RESULT
+           ================================================ */
+
+        state.recognition.onresult =
+            function (event) {
+
+                try {
+
+                    let transcript = "";
+
+                    for (
+                        let i = event.resultIndex;
+                        i < event.results.length;
+                        i++
+                    ) {
+
+                        if (
+                            event.results[i].isFinal
+                        ) {
+
+                            transcript +=
+                                " " +
+                                event.results[i][0].transcript;
+                        }
+                    }
+
+                    transcript =
+                        normalizeCommand(
+                            transcript
+                        );
+
+                    if (!transcript) {
+                        return;
+                    }
+
+                    console.log(
+                        "Voice command:",
+                        transcript
+                    );
+
+                    processVoiceCommand(
+                        transcript
+                    );
+
+                } catch (error) {
+
+                    console.error(
+                        "Voice result error:",
+                        error
+                    );
+
+                    showNotification(
+                        "Voice processing error"
+                    );
+                }
+            };
 
 
-    state.recognition.onend =
-        () => {
+        /* ================================================
+           ON ERROR
+           ================================================ */
 
-            state.listening = false;
+        state.recognition.onerror =
+            function (event) {
 
-            updateListeningUI(false);
+                state.recognitionStarting =
+                    false;
 
-            if(el.micStatus){
-                el.micStatus.textContent =
-                    "STANDBY";
-            }
+                state.listening =
+                    false;
 
-            setCoreStatus(
-                "JARVISH READY"
-            );
+                updateListeningUI(false);
 
-        };
+                console.error(
+                    "Speech recognition error:",
+                    event.error
+                );
 
+
+                switch (event.error) {
+
+                    case "not-allowed":
+
+                    case "service-not-allowed":
+
+                        setCoreStatus(
+                            "MICROPHONE DENIED"
+                        );
+
+                        speak(
+                            getLanguageText(
+                                "microphoneDenied"
+                            )
+                        );
+
+                        break;
+
+
+                    case "audio-capture":
+
+                        setCoreStatus(
+                            "MICROPHONE ERROR"
+                        );
+
+                        speak(
+                            getLanguageText(
+                                "microphoneError"
+                            )
+                        );
+
+                        break;
+
+
+                    case "no-speech":
+
+                        setCoreStatus(
+                            "NO SPEECH DETECTED"
+                        );
+
+                        break;
+
+
+                    case "network":
+
+                        setCoreStatus(
+                            "VOICE NETWORK ERROR"
+                        );
+
+                        speak(
+                            getLanguageText(
+                                "networkError"
+                            )
+                        );
+
+                        break;
+
+
+                    case "aborted":
+
+                        setCoreStatus(
+                            "JARVISH READY"
+                        );
+
+                        break;
+
+
+                    default:
+
+                        setCoreStatus(
+                            "VOICE ERROR"
+                        );
+
+                        break;
+                }
+            };
+
+
+        /* ================================================
+           ON END
+           ================================================ */
+
+        state.recognition.onend =
+            function () {
+
+                state.listening =
+                    false;
+
+                state.recognitionStarting =
+                    false;
+
+                updateListeningUI(false);
+
+                if (
+                    !state.manualStop
+                ) {
+
+                    setCoreStatus(
+                        "JARVISH READY"
+                    );
+                }
+
+                state.manualStop =
+                    false;
+
+                console.log(
+                    "JARVISH voice recognition ended."
+                );
+            };
+
+
+        if (el.systemVoice) {
+            el.systemVoice.textContent =
+                "READY";
+        }
+
+    } catch (error) {
+
+        console.error(
+            "Speech Recognition initialization failed:",
+            error
+        );
+
+        state.recognition =
+            null;
+
+        if (el.systemVoice) {
+            el.systemVoice.textContent =
+                "ERROR";
+        }
+    }
 }
 
 
@@ -540,12 +688,12 @@ function setupSpeechRecognition(){
    TOGGLE LISTENING
    ========================================================= */
 
-function toggleListening(){
+function toggleListening() {
 
-    if(!state.recognition){
+    if (!state.recognition) {
 
         speak(
-            getText(
+            getLanguageText(
                 "voiceUnavailable"
             )
         );
@@ -553,146 +701,649 @@ function toggleListening(){
         return;
     }
 
-
-    if(state.listening){
+    if (state.listening) {
 
         stopListening();
 
-    }else{
+    } else {
 
         startListening();
-
     }
-
 }
 
 
-function startListening(){
+/* =========================================================
+   START LISTENING
+   ========================================================= */
 
-    if(!state.recognition){
+function startListening() {
+
+    if (!state.recognition) {
         return;
     }
+
+    if (state.listening) {
+        return;
+    }
+
+    if (state.recognitionStarting) {
+        return;
+    }
+
+    state.recognitionStarting =
+        true;
+
+    state.manualStop =
+        false;
+
+
+    if (
+        state.speaking &&
+        "speechSynthesis" in window
+    ) {
+
+        speechSynthesis.cancel();
+
+        state.speaking =
+            false;
+    }
+
 
     state.recognition.lang =
         state.language;
 
-    try{
+
+    setCoreStatus(
+        getLanguageText(
+            "starting"
+        )
+    );
+
+
+    try {
 
         state.recognition.start();
 
-    }catch(error){
+    } catch (error) {
+
+        state.recognitionStarting =
+            false;
 
         console.warn(
             "Recognition start:",
             error
         );
 
-    }
+        if (
+            error.name ===
+            "InvalidStateError"
+        ) {
 
+            state.listening =
+                true;
+
+            updateListeningUI(true);
+
+        } else {
+
+            setCoreStatus(
+                "VOICE START ERROR"
+            );
+        }
+    }
 }
 
 
-function stopListening(){
+/* =========================================================
+   STOP LISTENING
+   ========================================================= */
 
-    if(!state.recognition){
+function stopListening() {
+
+    if (!state.recognition) {
         return;
     }
 
-    try{
+    state.manualStop =
+        true;
+
+    state.recognitionStarting =
+        false;
+
+    try {
 
         state.recognition.stop();
 
-    }catch(error){
+    } catch (error) {
 
         console.warn(
             "Recognition stop:",
             error
         );
 
-    }
+        state.listening =
+            false;
 
+        updateListeningUI(false);
+    }
 }
 
 
 /* =========================================================
-   LISTENING UI
+   NORMALIZE VOICE COMMAND
    ========================================================= */
 
-function updateListeningUI(active){
+function normalizeCommand(text) {
 
-    if(el.micButton){
-
-        el.micButton.classList.toggle(
-            "active",
-            active
-        );
-
-    }
-
-
-    if(el.listeningIndicator){
-
-        el.listeningIndicator.classList.toggle(
-            "active",
-            active
-        );
-
-    }
-
-
-    if(el.aiCore){
-
-        el.aiCore.classList.toggle(
-            "listening",
-            active
-        );
-
-    }
-
+    return String(text || "")
+        .normalize("NFKC")
+        .replace(
+            /[!?.,;:()[\]{}"'`~@#$%^&*_+=|\\/<>-]+/g,
+            " "
+        )
+        .replace(
+            /\s+/g,
+            " "
+        )
+        .trim()
+        .toLowerCase();
 }
 
 
 /* =========================================================
-   VOICE COMMAND PROCESSING
+   PROCESS VOICE COMMAND
    ========================================================= */
 
-function processVoiceCommand(text){
+async function processVoiceCommand(text) {
 
-    if(!text){
+    const commandText =
+        normalizeCommand(text);
+
+    if (!commandText) {
         return;
     }
 
 
-    el.heardText.textContent =
-        text;
+    /* ================================================
+       DISPLAY HEARD COMMAND
+       ================================================ */
+
+    if (el.heardText) {
+
+        el.heardText.textContent =
+            text;
+    }
 
 
     addHistory(text);
 
 
-    const result =
-        window.JARVISH_BRAIN
-            ? window.JARVISH_BRAIN.process(text)
-            : null;
+    /* ================================================
+       STOP LISTENING AFTER RESULT
+       ================================================ */
 
+    if (
+        state.recognition &&
+        state.listening
+    ) {
 
-    if(!result){
+        state.manualStop =
+            true;
 
-        executeNaturalCommand(
-            normalizeCommand(text)
-        );
-
-        return;
-
+        try {
+            state.recognition.stop();
+        } catch (error) {
+            console.warn(error);
+        }
     }
 
 
-    switch(result.type){
+    /* ================================================
+       AI BRAIN
+       ================================================ */
+
+    let brainResult =
+        null;
+
+    try {
+
+        if (
+            window.JARVISH_BRAIN &&
+            typeof
+                window.JARVISH_BRAIN.process ===
+                "function"
+        ) {
+
+            brainResult =
+                window.JARVISH_BRAIN.process(
+                    commandText
+                );
+        }
+
+    } catch (error) {
+
+        console.error(
+            "AI Brain error:",
+            error
+        );
+
+        brainResult =
+            null;
+    }
+
+
+    /* ================================================
+       FALLBACK BRAIN
+       ================================================ */
+
+    if (
+        !brainResult ||
+        !brainResult.type ||
+        brainResult.type === "unknown"
+    ) {
+
+        brainResult =
+            fallbackCommandParser(
+                commandText
+            );
+    }
+
+
+    console.log(
+        "JARVISH COMMAND:",
+        brainResult
+    );
+
+
+    /* ================================================
+       EXECUTE
+       ================================================ */
+
+    try {
+
+        await executeBrainCommand(
+            brainResult
+        );
+
+    } catch (error) {
+
+        console.error(
+            "Command execution error:",
+            error
+        );
+
+        speak(
+            getLanguageText(
+                "commandError"
+            )
+        );
+    }
+}
+
+
+/* =========================================================
+   FALLBACK COMMAND PARSER
+   ========================================================= */
+
+function fallbackCommandParser(text) {
+
+    const t =
+        normalizeCommand(text);
+
+
+    if (
+        containsAny(
+            t,
+            [
+                "map",
+                "naksha",
+                "नक्शा",
+                "नक्शा खोलो",
+                "નકશો"
+            ]
+        )
+    ) {
+        return { type: "map" };
+    }
+
+
+    if (
+        containsAny(
+            t,
+            [
+                "compass",
+                "direction",
+                "disha",
+                "कंपास",
+                "दिशा",
+                "કંપાસ",
+                "દિશા"
+            ]
+        )
+    ) {
+        return { type: "compass" };
+    }
+
+
+    if (
+        containsAny(
+            t,
+            [
+                "siren",
+                "alarm",
+                "सायरन",
+                "अलार्म",
+                "સાયરન"
+            ]
+        )
+    ) {
+        return { type: "siren" };
+    }
+
+
+    if (
+        containsAny(
+            t,
+            [
+                "flashlight",
+                "flash light",
+                "torch",
+                "light",
+                "टॉर्च",
+                "लाइट",
+                "ફ્લેશલાઇટ",
+                "ટોર્ચ",
+                "લાઇટ"
+            ]
+        )
+    ) {
+        return { type: "flashlight" };
+    }
+
+
+    if (
+        containsAny(
+            t,
+            [
+                "camera",
+                "कैमरा",
+                "કેમેરા"
+            ]
+        )
+    ) {
+        return { type: "camera" };
+    }
+
+
+    if (
+        containsAny(
+            t,
+            [
+                "location",
+                "gps",
+                "where am i",
+                "मेरी लोकेशन",
+                "लोकेशन",
+                "લોકેશન"
+            ]
+        )
+    ) {
+        return { type: "location" };
+    }
+
+
+    if (
+        containsAny(
+            t,
+            [
+                "weather",
+                "temperature",
+                "mausam",
+                "मौसम",
+                "तापमान",
+                "હવામાન",
+                "તાપમાન"
+            ]
+        )
+    ) {
+        return { type: "weather" };
+    }
+
+
+    if (
+        containsAny(
+            t,
+            [
+                "qr",
+                "qr code",
+                "क्यूआर",
+                "ક્યૂઆર"
+            ]
+        )
+    ) {
+        return { type: "qr" };
+    }
+
+
+    if (
+        containsAny(
+            t,
+            [
+                "youtube",
+                "यूट्यूब",
+                "યૂટ્યુબ"
+            ]
+        )
+    ) {
+        return { type: "youtube" };
+    }
+
+
+    if (
+        containsAny(
+            t,
+            [
+                "whatsapp",
+                "व्हाट्सएप",
+                "વોટ્સએપ"
+            ]
+        )
+    ) {
+        return { type: "whatsapp" };
+    }
+
+
+    if (
+        containsAny(
+            t,
+            [
+                "google",
+                "गूगल",
+                "ગૂગલ"
+            ]
+        )
+    ) {
+        return { type: "google" };
+    }
+
+
+    if (
+        containsAny(
+            t,
+            [
+                "instagram",
+                "इंस्टाग्राम",
+                "ઇન્સ્ટાગ્રામ"
+            ]
+        )
+    ) {
+        return { type: "instagram" };
+    }
+
+
+    if (
+        containsAny(
+            t,
+            [
+                "facebook",
+                "फेसबुक",
+                "ફેસબુક"
+            ]
+        )
+    ) {
+        return { type: "facebook" };
+    }
+
+
+    if (
+        containsAny(
+            t,
+            [
+                "time",
+                "समय",
+                "कितने बजे",
+                "સમય",
+                "કેટલા વાગ્યા"
+            ]
+        )
+    ) {
+        return { type: "time" };
+    }
+
+
+    if (
+        containsAny(
+            t,
+            [
+                "date",
+                "today",
+                "तारीख",
+                "आज",
+                "તારીખ",
+                "આજ"
+            ]
+        )
+    ) {
+        return { type: "date" };
+    }
+
+
+    if (
+        containsAny(
+            t,
+            [
+                "status",
+                "system status",
+                "स्टेटस",
+                "સિસ્ટમ સ્ટેટસ"
+            ]
+        )
+    ) {
+        return { type: "status" };
+    }
+
+
+    if (
+        containsAny(
+            t,
+            [
+                "clear history",
+                "delete history",
+                "हिस्ट्री साफ",
+                "હિસ્ટ્રી સાફ"
+            ]
+        )
+    ) {
+        return {
+            type: "clear-history"
+        };
+    }
+
+
+    if (
+        containsAny(
+            t,
+            [
+                "stop",
+                "stop all",
+                "band karo",
+                "बंद करो",
+                "બંધ કરો"
+            ]
+        )
+    ) {
+        return { type: "stop" };
+    }
+
+
+    if (
+        containsAny(
+            t,
+            [
+                "hello",
+                "hi",
+                "hey",
+                "namaste",
+                "नमस्ते",
+                "નમસ્તે"
+            ]
+        )
+    ) {
+        return { type: "greeting" };
+    }
+
+
+    return {
+        type: "unknown",
+        value: t
+    };
+}
+
+
+/* =========================================================
+   CONTAINS ANY
+   ========================================================= */
+
+function containsAny(
+    text,
+    words
+) {
+
+    const cleanText =
+        normalizeCommand(text);
+
+    return words.some(
+        word =>
+            cleanText.includes(
+                normalizeCommand(word)
+            )
+    );
+}
+
+
+/* =========================================================
+   EXECUTE AI COMMAND
+   ========================================================= */
+
+async function executeBrainCommand(
+    result
+) {
+
+    const type =
+        result &&
+        result.type
+            ? result.type
+            : "unknown";
+
+
+    switch (type) {
 
         case "greeting":
 
             speak(
-                getText("hello")
+                getLanguageText(
+                    "hello"
+                )
             );
 
             break;
@@ -700,77 +1351,213 @@ function processVoiceCommand(text){
 
         case "map":
 
-            executeCommand("map");
+            speak(
+                getLanguageText(
+                    "mapOpening"
+                )
+            );
+
+            setTimeout(
+                openMap,
+                300
+            );
 
             break;
 
 
         case "compass":
 
-            executeCommand("compass");
+            speak(
+                getLanguageText(
+                    "compassOpening"
+                )
+            );
+
+            setTimeout(
+                openCompass,
+                300
+            );
 
             break;
 
 
         case "siren":
 
-            executeCommand("siren");
+            speak(
+                getLanguageText(
+                    "sirenStarted"
+                )
+            );
+
+            setTimeout(
+                openSiren,
+                300
+            );
 
             break;
 
 
         case "flashlight":
 
-            executeCommand("flashlight");
+            await toggleFlashlight();
 
             break;
 
 
         case "camera":
 
-            executeCommand("camera");
+            speak(
+                getLanguageText(
+                    "cameraStarted"
+                )
+            );
+
+            setTimeout(
+                openCamera,
+                300
+            );
 
             break;
 
 
         case "location":
 
-            executeCommand("location");
+            speak(
+                getLanguageText(
+                    "locationOpening"
+                )
+            );
+
+            setTimeout(
+                openLocation,
+                300
+            );
 
             break;
 
 
         case "weather":
 
-            executeCommand("weather");
+            speak(
+                getLanguageText(
+                    "weatherOpening"
+                )
+            );
+
+            setTimeout(
+                openWeather,
+                300
+            );
 
             break;
 
 
         case "qr":
 
-            executeCommand("qr");
+            speak(
+                getLanguageText(
+                    "qrOpening"
+                )
+            );
+
+            setTimeout(
+                () =>
+                    openExternal(
+                        JARVISH_CONFIG.links.qr
+                    ),
+                300
+            );
 
             break;
 
 
         case "youtube":
 
-            executeCommand("youtube");
+            speak(
+                getLanguageText(
+                    "youtubeOpening"
+                )
+            );
+
+            setTimeout(
+                () =>
+                    openExternal(
+                        JARVISH_CONFIG.links.youtube
+                    ),
+                300
+            );
 
             break;
 
 
         case "whatsapp":
 
-            executeCommand("whatsapp");
+            speak(
+                getLanguageText(
+                    "whatsappOpening"
+                )
+            );
+
+            setTimeout(
+                () =>
+                    openExternal(
+                        JARVISH_CONFIG.links.whatsapp
+                    ),
+                300
+            );
 
             break;
 
 
         case "google":
 
-            executeCommand("google");
+            speak(
+                getLanguageText(
+                    "googleOpening"
+                )
+            );
+
+            setTimeout(
+                () =>
+                    openExternal(
+                        JARVISH_CONFIG.links.google
+                    ),
+                300
+            );
+
+            break;
+
+
+        case "instagram":
+
+            speak(
+                "Opening Instagram."
+            );
+
+            setTimeout(
+                () =>
+                    openExternal(
+                        JARVISH_CONFIG.links.instagram
+                    ),
+                300
+            );
+
+            break;
+
+
+        case "facebook":
+
+            speak(
+                "Opening Facebook."
+            );
+
+            setTimeout(
+                () =>
+                    openExternal(
+                        JARVISH_CONFIG.links.facebook
+                    ),
+                300
+            );
 
             break;
 
@@ -796,6 +1583,13 @@ function processVoiceCommand(text){
             break;
 
 
+        case "clear-history":
+
+            clearCommandHistory();
+
+            break;
+
+
         case "stop":
 
             stopAllModules();
@@ -806,709 +1600,244 @@ function processVoiceCommand(text){
         default:
 
             speak(
-                getText("unknown")
+                getLanguageText(
+                    "unknown"
+                )
             );
 
             break;
-
     }
-
 }
 
 
 /* =========================================================
-   NATURAL COMMAND PARSER
-   ========================================================= */
-
-function executeNaturalCommand(command){
-
-    /* MAP */
-
-    if(
-        containsAny(
-            command,
-            [
-                "map",
-                "maps",
-                "naksha",
-                "नक्शा",
-                "मैप",
-                "map kholo",
-                "map open"
-            ]
-        )
-    ){
-
-        executeCommand("map");
-        return;
-    }
-
-
-    /* COMPASS */
-
-    if(
-        containsAny(
-            command,
-            [
-                "compass",
-                "direction",
-                "disha",
-                "दिशा",
-                "कम्पास"
-            ]
-        )
-    ){
-
-        executeCommand("compass");
-        return;
-    }
-
-
-    /* SIREN */
-
-    if(
-        containsAny(
-            command,
-            [
-                "siren",
-                "alarm",
-                "emergency siren",
-                "सायरन",
-                "अलार्म"
-            ]
-        )
-    ){
-
-        executeCommand("siren");
-        return;
-    }
-
-
-    /* FLASHLIGHT */
-
-    if(
-        containsAny(
-            command,
-            [
-                "flashlight",
-                "torch",
-                "light",
-                "फ्लैशलाइट",
-                "टॉर्च",
-                "लाइट"
-            ]
-        )
-    ){
-
-        executeCommand("flashlight");
-        return;
-    }
-
-
-    /* CAMERA */
-
-    if(
-        containsAny(
-            command,
-            [
-                "camera",
-                "कैमरा"
-            ]
-        )
-    ){
-
-        executeCommand("camera");
-        return;
-    }
-
-
-    /* LOCATION */
-
-    if(
-        containsAny(
-            command,
-            [
-                "location",
-                "live location",
-                "gps",
-                "लोकेशन",
-                "स्थान"
-            ]
-        )
-    ){
-
-        executeCommand("location");
-        return;
-    }
-
-
-    /* QR */
-
-    if(
-        containsAny(
-            command,
-            [
-                "qr",
-                "qr generator",
-                "क्यूआर"
-            ]
-        )
-    ){
-
-        executeCommand("qr");
-        return;
-    }
-
-
-    /* WEATHER */
-
-    if(
-        containsAny(
-            command,
-            [
-                "weather",
-                "mausam",
-                "मौसम",
-                "temperature",
-                "तापमान"
-            ]
-        )
-    ){
-
-        executeCommand("weather");
-        return;
-    }
-
-
-    /* YOUTUBE */
-
-    if(
-        containsAny(
-            command,
-            [
-                "youtube",
-                "यूट्यूब"
-            ]
-        )
-    ){
-
-        executeCommand("youtube");
-        return;
-    }
-
-
-    /* WHATSAPP */
-
-    if(
-        containsAny(
-            command,
-            [
-                "whatsapp",
-                "व्हाट्सएप"
-            ]
-        )
-    ){
-
-        executeCommand("whatsapp");
-        return;
-    }
-
-
-    /* GOOGLE */
-
-    if(
-        containsAny(
-            command,
-            [
-                "google",
-                "गूगल",
-                "search"
-            ]
-        )
-    ){
-
-        executeCommand("google");
-        return;
-    }
-
-
-    /* TIME */
-
-    if(
-        containsAny(
-            command,
-            [
-                "time",
-                "samay",
-                "समय",
-                "kitne baje",
-                "कितने बजे"
-            ]
-        )
-    ){
-
-        tellTime();
-        return;
-    }
-
-
-    /* DATE */
-
-    if(
-        containsAny(
-            command,
-            [
-                "date",
-                "today",
-                "aaj",
-                "आज",
-                "tarikh",
-                "तारीख"
-            ]
-        )
-    ){
-
-        tellDate();
-        return;
-    }
-
-
-    /* CLEAR HISTORY */
-
-    if(
-        containsAny(
-            command,
-            [
-                "clear history",
-                "history clear"
-            ]
-        )
-    ){
-
-        clearCommandHistory();
-        return;
-    }
-
-
-    /* GREETING */
-
-    if(
-        containsAny(
-            command,
-            [
-                "hello",
-                "hi",
-                "hey",
-                "namaste",
-                "નમસ્તે",
-                "नमस्ते"
-            ]
-        )
-    ){
-
-        speak(
-            getText("hello")
-        );
-
-        return;
-    }
-
-
-    /* UNKNOWN */
-
-    speak(
-        getText("unknown")
-    );
-
-}
-
-
-function containsAny(text, words){
-
-    return words.some(
-        word =>
-            text.includes(
-                word.toLowerCase()
-            )
-    );
-
-}
-
-
-/* =========================================================
-   COMMAND EXECUTION
-   ========================================================= */
-
-function executeCommand(command){
-
-    switch(command){
-
-        case "map":
-            openMap();
-            break;
-
-        case "compass":
-            openCompass();
-            break;
-
-        case "siren":
-            openSiren();
-            break;
-
-        case "flashlight":
-            toggleFlashlight();
-            break;
-
-        case "camera":
-            openCamera();
-            break;
-
-        case "location":
-            openLocation();
-            break;
-
-        case "qr":
-            openExternal(
-                JARVISH_CONFIG.links.qr,
-                "QR Generator"
-            );
-            break;
-
-        case "weather":
-            openWeather();
-            break;
-
-        case "youtube":
-            openExternal(
-                JARVISH_CONFIG.links.youtube,
-                "YouTube"
-            );
-            break;
-
-        case "whatsapp":
-            openExternal(
-                JARVISH_CONFIG.links.whatsapp,
-                "WhatsApp"
-            );
-            break;
-
-        case "google":
-            openExternal(
-                JARVISH_CONFIG.links.google,
-                "Google"
-            );
-            break;
-
-        default:
-            break;
-
-    }
-
-}
-
-
-/* =========================================================
-   INTERNAL MODULE
+   MODULE OVERLAY
    ========================================================= */
 
 function openModule(
     title,
     content
-){
+) {
 
-    if(!el.moduleOverlay){
-        return;
+    if (el.moduleTitle) {
+        el.moduleTitle.textContent =
+            title;
+    }
+
+    if (el.moduleContent) {
+        el.moduleContent.innerHTML =
+            content;
+    }
+
+    if (el.moduleOverlay) {
+
+        el.moduleOverlay.classList.add(
+            "active"
+        );
+
+        el.moduleOverlay.style.display =
+            "flex";
     }
 
     state.currentModule =
         title;
-
-    el.moduleTitle.textContent =
-        title;
-
-    el.moduleContent.innerHTML =
-        content;
-
-    el.moduleOverlay.classList.add(
-        "open"
-    );
-
-    el.moduleOverlay.setAttribute(
-        "aria-hidden",
-        "false"
-    );
-
 }
 
 
-function closeModule(){
-
-    stopCamera();
+function closeModule() {
 
     stopCompass();
 
-    stopSiren();
-
-    if(el.moduleOverlay){
+    if (el.moduleOverlay) {
 
         el.moduleOverlay.classList.remove(
-            "open"
+            "active"
         );
 
-        el.moduleOverlay.setAttribute(
-            "aria-hidden",
-            "true"
-        );
-
+        el.moduleOverlay.style.display =
+            "";
     }
 
     state.currentModule =
         null;
-
 }
 
 
 /* =========================================================
-   INTERNAL MAP
+   MAP
    ========================================================= */
 
-function openMap(){
+function openMap() {
 
-    speak(
-        getText("mapOpening")
-    );
+    const latitude =
+        window.jarvishLocation &&
+        window.jarvishLocation.latitude
+            ? window.jarvishLocation.latitude
+            : 23.0225;
+
+    const longitude =
+        window.jarvishLocation &&
+        window.jarvishLocation.longitude
+            ? window.jarvishLocation.longitude
+            : 72.5714;
+
+
+    const mapURL =
+        `https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=15/${latitude}/${longitude}`;
 
 
     openModule(
-        "LIVE MAP",
+        "JARVISH MAP",
         `
-        <div style="
-            width:100%;
-            height:100%;
-            display:flex;
-            flex-direction:column;
-            gap:15px;
-        ">
+        <div class="jarvish-module map-module">
 
-            <div style="
-                display:flex;
-                justify-content:space-between;
-                gap:10px;
-                flex-wrap:wrap;
-            ">
-
-                <button
-                    id="mapLocateButton"
-                    class="command-button"
-                    type="button"
-                >
-                    📍 MY LOCATION
-                </button>
-
-                <a
-                    href="https://www.openstreetmap.org/"
-                    target="_blank"
-                    rel="noopener"
-                    class="command-button"
-                    style="
-                        text-decoration:none;
-                        display:flex;
-                        align-items:center;
-                        justify-content:center;
-                    "
-                >
-                    OPEN FULL MAP
-                </a>
-
+            <div class="module-big-icon">
+                🗺️
             </div>
 
-            <div
-                id="jarvishMap"
-                style="
-                    flex:1;
-                    min-height:350px;
-                    border:1px solid rgba(0,234,255,.25);
-                    border-radius:14px;
-                    overflow:hidden;
-                    background:
-                        radial-gradient(
-                            circle,
-                            #0b3044,
-                            #020711
-                        );
-                    display:flex;
-                    align-items:center;
-                    justify-content:center;
-                    text-align:center;
-                    padding:25px;
-                    color:#75a5b7;
-                "
+            <div class="module-main-value">
+                MAP READY
+            </div>
+
+            <div class="module-info">
+                Latitude: ${latitude.toFixed(6)}
+                <br>
+                Longitude: ${longitude.toFixed(6)}
+            </div>
+
+            <button
+                class="module-action"
+                onclick="window.open('${mapURL}','_blank')"
             >
+                OPEN MAP
+            </button>
 
-                <div>
-                    <div style="
-                        font-size:50px;
-                        margin-bottom:15px;
-                    ">
-                        🗺️
-                    </div>
-
-                    <div style="
-                        color:#00eaff;
-                        letter-spacing:2px;
-                    ">
-                        JARVISH MAP
-                    </div>
-
-                    <div style="
-                        margin-top:8px;
-                        font-size:11px;
-                    ">
-                        GPS location will appear here.
-                    </div>
-                </div>
-
-            </div>
+            <button
+                class="module-action"
+                onclick="window.JARVISH.openLocation()"
+            >
+                MY LOCATION
+            </button>
 
         </div>
         `
     );
-
-
-    const button =
-        document.getElementById(
-            "mapLocateButton"
-        );
-
-    if(button){
-
-        button.addEventListener(
-            "click",
-            requestLocation
-        );
-
-    }
-
 }
 
 
 /* =========================================================
-   INTERNAL COMPASS
+   COMPASS
    ========================================================= */
 
-function openCompass(){
+function openCompass() {
 
-    speak(
-        getText("compassOpening")
-    );
+    const supported =
+        "DeviceOrientationEvent" in window;
+
+    if (!supported) {
+
+        openModule(
+            "JARVISH COMPASS",
+            `
+            <div class="jarvish-module">
+                <div class="module-big-icon">
+                    🧭
+                </div>
+
+                <div class="module-main-value">
+                    COMPASS UNSUPPORTED
+                </div>
+
+                <div class="module-info">
+                    Your browser does not provide
+                    device orientation.
+                </div>
+            </div>
+            `
+        );
+
+        return;
+    }
 
 
     openModule(
-        "DIGITAL COMPASS",
+        "JARVISH COMPASS",
         `
-        <div style="
-            width:100%;
-            height:100%;
-            display:flex;
-            flex-direction:column;
-            align-items:center;
-            justify-content:center;
-            gap:25px;
-        ">
+        <div class="jarvish-module compass-module">
 
             <div
-                id="compassCircle"
+                id="jarvishCompass"
                 style="
-                    position:relative;
-                    width:min(70vw,330px);
-                    aspect-ratio:1;
-                    border:2px solid #00eaff;
+                    width:220px;
+                    height:220px;
+                    margin:20px auto;
+                    border:3px solid currentColor;
                     border-radius:50%;
-                    display:grid;
-                    place-items:center;
-                    background:
-                        radial-gradient(
-                            circle,
-                            rgba(0,234,255,.12),
-                            rgba(2,7,17,.95) 65%
-                        );
-                    box-shadow:
-                        0 0 35px rgba(0,234,255,.2),
-                        inset 0 0 35px rgba(0,234,255,.08);
-                    transition:transform .2s linear;
+                    display:flex;
+                    align-items:center;
+                    justify-content:center;
+                    position:relative;
+                    font-size:26px;
                 "
             >
 
-                <div style="
-                    position:absolute;
-                    top:12px;
-                    color:#00eaff;
-                    font-size:18px;
-                    font-weight:bold;
-                ">
+                <span
+                    style="
+                        position:absolute;
+                        top:10px;
+                    "
+                >
                     N
-                </div>
+                </span>
 
-                <div style="
-                    position:absolute;
-                    right:14px;
-                    color:#75a5b7;
-                    font-size:15px;
-                ">
+                <span
+                    style="
+                        position:absolute;
+                        right:10px;
+                    "
+                >
                     E
-                </div>
+                </span>
 
-                <div style="
-                    position:absolute;
-                    bottom:12px;
-                    color:#75a5b7;
-                    font-size:15px;
-                ">
+                <span
+                    style="
+                        position:absolute;
+                        bottom:10px;
+                    "
+                >
                     S
-                </div>
+                </span>
 
-                <div style="
-                    position:absolute;
-                    left:14px;
-                    color:#75a5b7;
-                    font-size:15px;
-                ">
+                <span
+                    style="
+                        position:absolute;
+                        left:10px;
+                    "
+                >
                     W
+                </span>
+
+                <div
+                    id="jarvishHeading"
+                    style="
+                        font-size:32px;
+                        font-weight:bold;
+                    "
+                >
+                    0°
                 </div>
 
-                <div style="
-                    width:0;
-                    height:0;
-                    border-left:10px solid transparent;
-                    border-right:10px solid transparent;
-                    border-bottom:75px solid #ff304f;
-                    transform-origin:50% 90%;
-                "></div>
-
             </div>
 
-
             <div
-                id="headingValue"
-                style="
-                    font-size:32px;
-                    color:#00eaff;
-                    letter-spacing:3px;
-                "
+                id="jarvishDirection"
+                class="module-main-value"
             >
-                --°
+                NORTH
             </div>
 
-
-            <div
-                id="directionValue"
-                style="
-                    font-size:12px;
-                    color:#75a5b7;
-                    letter-spacing:3px;
-                "
-            >
-                CALIBRATING
+            <div class="module-info">
+                Rotate your device to change direction.
             </div>
 
         </div>
@@ -1517,120 +1846,89 @@ function openCompass(){
 
 
     startCompass();
-
 }
 
 
-/* =========================================================
-   COMPASS SENSOR
-   ========================================================= */
-
-function startCompass(){
+function startCompass() {
 
     stopCompass();
 
-    const circle =
-        document.getElementById(
-            "compassCircle"
-        );
-
-    const heading =
-        document.getElementById(
-            "headingValue"
-        );
-
-    const direction =
-        document.getElementById(
-            "directionValue"
-        );
-
-
-    if(!circle){
-        return;
-    }
+    state.compassActive =
+        true;
 
 
     state.compassHandler =
-        event => {
+        function (event) {
 
-            let degrees = null;
+            let heading = 0;
 
 
-            if(
+            if (
                 typeof event.webkitCompassHeading ===
                 "number"
-            ){
+            ) {
 
-                degrees =
+                heading =
                     event.webkitCompassHeading;
 
-            }else if(
+            } else if (
                 typeof event.alpha ===
                 "number"
-            ){
+            ) {
 
-                degrees =
+                heading =
                     360 - event.alpha;
-
             }
 
 
-            if(degrees === null){
-                return;
-            }
-
-
-            degrees =
+            heading =
                 normalizeDegree(
-                    degrees
+                    heading
                 );
 
 
-            circle.style.transform =
-                `rotate(${-degrees}deg)`;
+            const headingElement =
+                document.getElementById(
+                    "jarvishHeading"
+                );
+
+            const directionElement =
+                document.getElementById(
+                    "jarvishDirection"
+                );
 
 
-            if(heading){
+            if (headingElement) {
 
-                heading.textContent =
-                    `${Math.round(degrees)}°`;
-
+                headingElement.textContent =
+                    Math.round(heading) +
+                    "°";
             }
 
 
-            if(direction){
+            if (directionElement) {
 
-                direction.textContent =
+                directionElement.textContent =
                     getDirection(
-                        degrees
+                        heading
                     );
-
             }
-
         };
 
 
-    if(
-        "DeviceOrientationEvent" in window
-    ){
-
-        window.addEventListener(
-            "deviceorientation",
-            state.compassHandler,
-            true
-        );
-
-    }
-
+    window.addEventListener(
+        "deviceorientation",
+        state.compassHandler,
+        true
+    );
 }
 
 
-function stopCompass(){
+function stopCompass() {
 
-    if(
-        state.compassHandler &&
-        "DeviceOrientationEvent" in window
-    ){
+    if (
+        state.compassHandler
+    ) {
 
         window.removeEventListener(
             "deviceorientation",
@@ -1638,60 +1936,54 @@ function stopCompass(){
             true
         );
 
+        state.compassHandler =
+            null;
     }
 
-    state.compassHandler =
-        null;
-
+    state.compassActive =
+        false;
 }
 
 
-function normalizeDegree(degree){
+function normalizeDegree(
+    degree
+) {
+
+    degree =
+        Number(degree) || 0;
 
     return (
         degree + 360
     ) % 360;
-
 }
 
 
-function getDirection(degree){
+function getDirection(
+    degree
+) {
 
-    if(degree >= 337.5 || degree < 22.5){
-        return "NORTH";
-    }
+    const directions = [
+        "NORTH",
+        "NORTH-EAST",
+        "EAST",
+        "SOUTH-EAST",
+        "SOUTH",
+        "SOUTH-WEST",
+        "WEST",
+        "NORTH-WEST"
+    ];
 
-    if(degree < 67.5){
-        return "NORTH EAST";
-    }
+    const index =
+        Math.round(
+            degree / 45
+        ) % 8;
 
-    if(degree < 112.5){
-        return "EAST";
-    }
-
-    if(degree < 157.5){
-        return "SOUTH EAST";
-    }
-
-    if(degree < 202.5){
-        return "SOUTH";
-    }
-
-    if(degree < 247.5){
-        return "SOUTH WEST";
-    }
-
-    if(degree < 292.5){
-        return "WEST";
-    }
-
-    return "NORTH WEST";
-
+    return directions[index];
 }
 
 
 /* =========================================================
-   INTERNAL SIREN
+   SIREN
    ========================================================= */
 
 let sirenContext = null;
@@ -1700,123 +1992,25 @@ let sirenGain = null;
 let sirenTimer = null;
 
 
-function openSiren(){
+function openSiren() {
 
-    openModule(
-        "EMERGENCY SIREN",
-        `
-        <div style="
-            height:100%;
-            display:flex;
-            flex-direction:column;
-            align-items:center;
-            justify-content:center;
-            text-align:center;
-            gap:25px;
-        ">
-
-            <div style="
-                font-size:80px;
-                animation:sirenPulse 1s infinite;
-            ">
-                🚨
-            </div>
-
-            <div style="
-                color:#ff304f;
-                font-size:20px;
-                letter-spacing:4px;
-            ">
-                EMERGENCY SIREN
-            </div>
-
-            <div style="
-                color:#75a5b7;
-                font-size:11px;
-                max-width:450px;
-                line-height:1.7;
-            ">
-                Start or stop the local browser siren.
-            </div>
-
-            <button
-                id="sirenToggle"
-                type="button"
-                style="
-                    width:180px;
-                    height:55px;
-                    border:1px solid #ff304f;
-                    border-radius:12px;
-                    background:rgba(255,48,79,.08);
-                    color:#ff6178;
-                    cursor:pointer;
-                    letter-spacing:3px;
-                    font-weight:bold;
-                "
-            >
-                START SIREN
-            </button>
-
-        </div>
-
-        <style>
-            @keyframes sirenPulse{
-                50%{
-                    transform:scale(1.12);
-                    filter:
-                        drop-shadow(
-                            0 0 25px
-                            rgba(255,48,79,.8)
-                        );
-                }
-            }
-        </style>
-        `
-    );
-
-
-    const button =
-        document.getElementById(
-            "sirenToggle"
-        );
-
-    if(button){
-
-        button.addEventListener(
-            "click",
-            toggleSiren
-        );
-
-    }
-
-}
-
-
-function toggleSiren(){
-
-    if(sirenOscillator){
+    if (
+        sirenOscillator
+    ) {
 
         stopSiren();
 
-        const button =
-            document.getElementById(
-                "sirenToggle"
-            );
-
-        if(button){
-            button.textContent =
-                "START SIREN";
-        }
-
         speak(
-            getText("sirenStopped")
+            getLanguageText(
+                "sirenStopped"
+            )
         );
 
         return;
     }
 
 
-    try{
+    try {
 
         sirenContext =
             new (
@@ -1825,71 +2019,92 @@ function toggleSiren(){
             )();
 
 
+        sirenOscillator =
+            sirenContext.createOscillator();
+
         sirenGain =
             sirenContext.createGain();
 
+
+        sirenOscillator.type =
+            "sawtooth";
+
+        sirenOscillator.frequency.value =
+            700;
+
         sirenGain.gain.value =
             0.08;
+
+
+        sirenOscillator.connect(
+            sirenGain
+        );
 
         sirenGain.connect(
             sirenContext.destination
         );
 
 
-        sirenOscillator =
-            sirenContext.createOscillator();
-
-        sirenOscillator.type =
-            "sawtooth";
-
-        sirenOscillator.connect(
-            sirenGain
-        );
-
         sirenOscillator.start();
 
 
-        let high = false;
-
+        let high = true;
 
         sirenTimer =
             setInterval(
-                () => {
-
-                    if(!sirenOscillator){
-                        return;
-                    }
+                function () {
 
                     high = !high;
 
-                    sirenOscillator.frequency
-                        .setTargetAtTime(
-                            high ? 1000 : 500,
+                    if (
+                        sirenOscillator &&
+                        sirenContext
+                    ) {
+
+                        sirenOscillator.frequency.setTargetAtTime(
+                            high
+                                ? 1100
+                                : 650,
                             sirenContext.currentTime,
-                            .05
+                            0.08
                         );
+                    }
 
                 },
-                500
+                450
             );
 
 
-        const button =
-            document.getElementById(
-                "sirenToggle"
-            );
+        openModule(
+            "JARVISH SIREN",
+            `
+            <div class="jarvish-module">
 
-        if(button){
-            button.textContent =
-                "STOP SIREN";
-        }
+                <div class="module-big-icon">
+                    🚨
+                </div>
 
+                <div class="module-main-value">
+                    SIREN ACTIVE
+                </div>
 
-        speak(
-            getText("sirenStarted")
+                <div class="module-info">
+                    Emergency siren is running.
+                </div>
+
+                <button
+                    class="module-action"
+                    onclick="window.JARVISH.stopSiren()"
+                >
+                    STOP SIREN
+                </button>
+
+            </div>
+            `
         );
 
-    }catch(error){
+
+    } catch (error) {
 
         console.error(
             "Siren error:",
@@ -1897,17 +2112,15 @@ function toggleSiren(){
         );
 
         speak(
-            "Siren audio could not start."
+            "Siren could not start."
         );
-
     }
-
 }
 
 
-function stopSiren(){
+function stopSiren() {
 
-    if(sirenTimer){
+    if (sirenTimer) {
 
         clearInterval(
             sirenTimer
@@ -1915,47 +2128,44 @@ function stopSiren(){
 
         sirenTimer =
             null;
-
     }
 
 
-    if(sirenOscillator){
+    if (sirenOscillator) {
 
-        try{
+        try {
             sirenOscillator.stop();
-        }catch(error){}
+        } catch (error) {
+            console.warn(error);
+        }
 
         sirenOscillator.disconnect();
 
         sirenOscillator =
             null;
-
     }
 
 
-    if(sirenGain){
+    if (sirenGain) {
 
-        try{
-            sirenGain.disconnect();
-        }catch(error){}
+        sirenGain.disconnect();
 
         sirenGain =
             null;
-
     }
 
 
-    if(sirenContext){
+    if (sirenContext) {
 
-        try{
+        try {
             sirenContext.close();
-        }catch(error){}
+        } catch (error) {
+            console.warn(error);
+        }
 
         sirenContext =
             null;
-
     }
-
 }
 
 
@@ -1963,155 +2173,193 @@ function stopSiren(){
    FLASHLIGHT
    ========================================================= */
 
-async function toggleFlashlight(){
+async function toggleFlashlight() {
 
-    if(
-        state.cameraTrack &&
-        typeof state.cameraTrack.applyConstraints ===
-        "function"
-    ){
+    if (
+        state.cameraTrack
+    ) {
 
-        try{
+        try {
+
+            const capabilities =
+                state.cameraTrack.getCapabilities();
+
+            if (
+                capabilities &&
+                capabilities.torch
+            ) {
+
+                state.flashlight =
+                    !state.flashlight;
+
+                await state.cameraTrack.applyConstraints(
+                    {
+                        advanced: [
+                            {
+                                torch:
+                                    state.flashlight
+                            }
+                        ]
+                    }
+                );
+
+
+                speak(
+                    state.flashlight
+                        ? getLanguageText(
+                            "flashlightOn"
+                        )
+                        : getLanguageText(
+                            "flashlightOff"
+                        )
+                );
+
+                return;
+            }
+
+        } catch (error) {
+
+            console.warn(
+                "Torch constraint error:",
+                error
+            );
+        }
+    }
+
+
+    try {
+
+        if (
+            !state.cameraStream
+        ) {
+
+            state.cameraStream =
+                await navigator.mediaDevices.getUserMedia(
+                    {
+                        video: {
+                            facingMode:
+                                {
+                                    ideal:
+                                        "environment"
+                                }
+                        },
+                        audio: false
+                    }
+                );
+
+            state.cameraTrack =
+                state.cameraStream.getVideoTracks()[0];
+        }
+
+
+        const capabilities =
+            state.cameraTrack &&
+            state.cameraTrack.getCapabilities
+                ? state.cameraTrack.getCapabilities()
+                : null;
+
+
+        if (
+            capabilities &&
+            capabilities.torch
+        ) {
 
             state.flashlight =
                 !state.flashlight;
 
-
-            await state.cameraTrack.applyConstraints({
-
-                advanced:[
-                    {
-                        torch:
-                            state.flashlight
-                    }
-                ]
-
-            });
+            await state.cameraTrack.applyConstraints(
+                {
+                    advanced: [
+                        {
+                            torch:
+                                state.flashlight
+                        }
+                    ]
+                }
+            );
 
 
             speak(
                 state.flashlight
-                    ? getText("flashlightOn")
-                    : getText("flashlightOff")
+                    ? getLanguageText(
+                        "flashlightOn"
+                    )
+                    : getLanguageText(
+                        "flashlightOff"
+                    )
             );
 
             return;
-
-        }catch(error){
-
-            console.warn(
-                "Torch control failed:",
-                error
-            );
-
         }
 
-    }
 
+        openModule(
+            "JARVISH FLASHLIGHT",
+            `
+            <div class="jarvish-module">
 
-    /*
-       If no active camera track exists,
-       open a flashlight control panel.
-    */
+                <div class="module-big-icon">
+                    🔦
+                </div>
 
-    openModule(
-        "FLASHLIGHT",
-        `
-        <div style="
-            height:100%;
-            display:flex;
-            flex-direction:column;
-            align-items:center;
-            justify-content:center;
-            text-align:center;
-            gap:20px;
-        ">
+                <div class="module-main-value">
+                    TORCH CONTROL
+                </div>
 
-            <div
-                id="flashIcon"
-                style="
-                    font-size:80px;
-                    transition:.3s;
-                "
-            >
-                🔦
+                <div class="module-info">
+                    Your browser/device does not
+                    expose hardware torch control.
+                </div>
+
             </div>
-
-            <div
-                id="flashState"
-                style="
-                    color:#75a5b7;
-                    letter-spacing:3px;
-                "
-            >
-                READY
-            </div>
-
-            <button
-                id="flashToggle"
-                type="button"
-                style="
-                    width:180px;
-                    height:55px;
-                    border:1px solid #00eaff;
-                    border-radius:12px;
-                    background:rgba(0,234,255,.06);
-                    color:#00eaff;
-                    cursor:pointer;
-                    letter-spacing:3px;
-                "
-            >
-                TURN ON
-            </button>
-
-            <div style="
-                max-width:420px;
-                color:#75a5b7;
-                font-size:10px;
-                line-height:1.6;
-            ">
-                Browser flashlight control depends on
-                device and camera torch support.
-            </div>
-
-        </div>
-        `
-    );
-
-
-    const button =
-        document.getElementById(
-            "flashToggle"
+            `
         );
 
-    if(button){
 
-        button.addEventListener(
-            "click",
-            enableFlashlightWithCamera
+        speak(
+            getLanguageText(
+                "flashlightUnsupported"
+            )
         );
 
-    }
 
+    } catch (error) {
+
+        console.error(
+            "Flashlight error:",
+            error
+        );
+
+        speak(
+            "Camera permission is required for flashlight."
+        );
+    }
 }
 
 
-async function enableFlashlightWithCamera(){
+/* =========================================================
+   CAMERA
+   ========================================================= */
 
-    try{
+async function openCamera() {
+
+    try {
+
+        stopCamera();
+
 
         const stream =
-            await navigator.mediaDevices.getUserMedia({
-
-                video:{
-                    facingMode:{
-                        ideal:"environment"
-                    }
-                },
-
-                audio:false
-
-            });
+            await navigator.mediaDevices.getUserMedia(
+                {
+                    video: {
+                        facingMode: {
+                            ideal:
+                                "environment"
+                        }
+                    },
+                    audio: false
+                }
+            );
 
 
         state.cameraStream =
@@ -2121,248 +2369,53 @@ async function enableFlashlightWithCamera(){
             stream.getVideoTracks()[0];
 
 
-        if(
-            !state.cameraTrack ||
-            !state.cameraTrack.applyConstraints
-        ){
+        openModule(
+            "JARVISH CAMERA",
+            `
+            <div class="jarvish-module">
 
-            throw new Error(
-                "Torch unsupported"
-            );
+                <video
+                    id="jarvishCameraVideo"
+                    autoplay
+                    playsinline
+                    muted
+                    style="
+                        width:100%;
+                        max-width:700px;
+                        border-radius:18px;
+                        background:#000;
+                    "
+                ></video>
 
-        }
-
-
-        state.flashlight =
-            !state.flashlight;
-
-
-        await state.cameraTrack.applyConstraints({
-
-            advanced:[
-                {
-                    torch:
-                        state.flashlight
-                }
-            ]
-
-        });
-
-
-        const stateText =
-            document.getElementById(
-                "flashState"
-            );
-
-        const button =
-            document.getElementById(
-                "flashToggle"
-            );
-
-        const icon =
-            document.getElementById(
-                "flashIcon"
-            );
-
-
-        if(stateText){
-
-            stateText.textContent =
-                state.flashlight
-                    ? "FLASHLIGHT ON"
-                    : "FLASHLIGHT OFF";
-
-        }
-
-
-        if(button){
-
-            button.textContent =
-                state.flashlight
-                    ? "TURN OFF"
-                    : "TURN ON";
-
-        }
-
-
-        if(icon){
-
-            icon.style.filter =
-                state.flashlight
-                    ? "drop-shadow(0 0 30px #fff)"
-                    : "none";
-
-        }
-
-
-        speak(
-            state.flashlight
-                ? getText("flashlightOn")
-                : getText("flashlightOff")
-        );
-
-    }catch(error){
-
-        console.error(
-            "Flashlight error:",
-            error
-        );
-
-        speak(
-            getText(
-                "flashlightUnsupported"
-            )
-        );
-
-    }
-
-}
-
-
-/* =========================================================
-   CAMERA
-   ========================================================= */
-
-async function openCamera(){
-
-    openModule(
-        "HD SMART CAMERA",
-        `
-        <div style="
-            height:100%;
-            display:flex;
-            flex-direction:column;
-            gap:12px;
-        ">
-
-            <video
-                id="jarvishCamera"
-                autoplay
-                playsinline
-                muted
-                style="
-                    width:100%;
-                    height:calc(100% - 65px);
-                    object-fit:cover;
-                    border-radius:14px;
-                    background:#000;
-                    border:1px solid rgba(0,234,255,.25);
-                "
-            ></video>
-
-            <div style="
-                display:flex;
-                justify-content:center;
-                gap:10px;
-            ">
+                <div class="module-info">
+                    Camera is active.
+                </div>
 
                 <button
-                    id="cameraStart"
-                    class="command-button"
-                    type="button"
-                    style="max-width:170px;"
+                    class="module-action"
+                    onclick="window.JARVISH.closeCamera()"
                 >
-                    START CAMERA
-                </button>
-
-                <button
-                    id="cameraStop"
-                    class="command-button"
-                    type="button"
-                    style="max-width:170px;"
-                >
-                    STOP
+                    CLOSE CAMERA
                 </button>
 
             </div>
-
-        </div>
-        `
-    );
-
-
-    const start =
-        document.getElementById(
-            "cameraStart"
+            `
         );
-
-    const stop =
-        document.getElementById(
-            "cameraStop"
-        );
-
-
-    if(start){
-
-        start.addEventListener(
-            "click",
-            startCamera
-        );
-
-    }
-
-
-    if(stop){
-
-        stop.addEventListener(
-            "click",
-            stopCamera
-        );
-
-    }
-
-
-    await startCamera();
-
-}
-
-
-async function startCamera(){
-
-    try{
-
-        stopCamera();
 
 
         const video =
             document.getElementById(
-                "jarvishCamera"
+                "jarvishCameraVideo"
             );
 
-        if(!video){
-            return;
+
+        if (video) {
+            video.srcObject =
+                stream;
         }
 
 
-        state.cameraStream =
-            await navigator.mediaDevices
-                .getUserMedia({
-
-                    video:{
-                        facingMode:{
-                            ideal:"environment"
-                        }
-                    },
-
-                    audio:false
-
-                });
-
-
-        state.cameraTrack =
-            state.cameraStream
-                .getVideoTracks()[0];
-
-
-        video.srcObject =
-            state.cameraStream;
-
-
-        speak(
-            getText("cameraStarted")
-        );
-
-    }catch(error){
+    } catch (error) {
 
         console.error(
             "Camera error:",
@@ -2370,17 +2423,19 @@ async function startCamera(){
         );
 
         speak(
-            getText("cameraDenied")
+            getLanguageText(
+                "cameraDenied"
+            )
         );
-
     }
-
 }
 
 
-function stopCamera(){
+function stopCamera() {
 
-    if(state.cameraStream){
+    if (
+        state.cameraStream
+    ) {
 
         state.cameraStream
             .getTracks()
@@ -2389,17 +2444,12 @@ function stopCamera(){
                     track.stop()
             );
 
+        state.cameraStream =
+            null;
     }
-
-    state.cameraStream =
-        null;
 
     state.cameraTrack =
         null;
-
-    state.flashlight =
-        false;
-
 }
 
 
@@ -2407,221 +2457,179 @@ function stopCamera(){
    LOCATION
    ========================================================= */
 
-function requestLocation(){
+function requestLocation() {
 
-    if(
+    if (
         !navigator.geolocation
-    ){
+    ) {
 
-        updateLocationStatus(
-            "UNAVAILABLE"
-        );
+        if (el.locationStatus) {
+            el.locationStatus.textContent =
+                "UNAVAILABLE";
+        }
 
         return;
-
     }
-
-
-    updateLocationStatus(
-        "SEARCHING"
-    );
 
 
     navigator.geolocation.getCurrentPosition(
 
-        position => {
+        function (position) {
 
-            const lat =
+            const latitude =
                 position.coords.latitude;
 
-            const lon =
+            const longitude =
                 position.coords.longitude;
 
 
-            updateLocationStatus(
-                "LOCKED"
-            );
+            window.jarvishLocation = {
+
+                latitude,
+                longitude,
+
+                accuracy:
+                    position.coords.accuracy
+            };
 
 
-            if(el.gpsValue){
+            if (el.locationStatus) {
 
-                el.gpsValue.textContent =
-                    `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
-
+                el.locationStatus.textContent =
+                    "GPS READY";
             }
 
 
-            window.jarvishLocation = {
-                latitude:lat,
-                longitude:lon
-            };
+            if (el.gpsValue) {
+
+                el.gpsValue.textContent =
+                    latitude.toFixed(4) +
+                    ", " +
+                    longitude.toFixed(4);
+            }
 
         },
 
-        error => {
+        function (error) {
 
             console.warn(
-                "GPS:",
+                "Location error:",
                 error
             );
 
-            updateLocationStatus(
-                "DENIED"
-            );
+            if (el.locationStatus) {
 
+                el.locationStatus.textContent =
+                    "GPS WAITING";
+            }
         },
 
         {
-            enableHighAccuracy:true,
-            timeout:10000,
-            maximumAge:30000
+            enableHighAccuracy:
+                true,
+
+            timeout:
+                10000,
+
+            maximumAge:
+                30000
         }
-
     );
-
-}
-
-
-function updateLocationStatus(text){
-
-    if(el.locationStatus){
-
-        el.locationStatus.textContent =
-            text;
-
-    }
-
 }
 
 
 /* =========================================================
-   LOCATION MODULE
+   OPEN LOCATION
    ========================================================= */
 
-function openLocation(){
+function openLocation() {
 
     requestLocation();
 
 
-    const location =
-        window.jarvishLocation;
+    setTimeout(
+        function () {
+
+            const location =
+                window.jarvishLocation;
 
 
-    const latitude =
-        location
-            ? location.latitude.toFixed(6)
-            : "--";
+            if (!location) {
 
+                openModule(
+                    "JARVISH LOCATION",
+                    `
+                    <div class="jarvish-module">
 
-    const longitude =
-        location
-            ? location.longitude.toFixed(6)
-            : "--";
+                        <div class="module-big-icon">
+                            📍
+                        </div>
 
+                        <div class="module-main-value">
+                            GPS WAITING
+                        </div>
 
-    openModule(
-        "LIVE LOCATION",
-        `
-        <div style="
-            height:100%;
-            display:flex;
-            flex-direction:column;
-            align-items:center;
-            justify-content:center;
-            text-align:center;
-            gap:18px;
-        ">
+                        <div class="module-info">
+                            Please allow location permission.
+                        </div>
 
-            <div style="
-                font-size:70px;
-            ">
-                📍
-            </div>
+                    </div>
+                    `
+                );
 
-            <div style="
-                color:#00eaff;
-                font-size:12px;
-                letter-spacing:3px;
-            ">
-                CURRENT GPS
-            </div>
-
-            <div style="
-                padding:20px;
-                width:min(450px,90%);
-                border:1px solid rgba(0,234,255,.2);
-                border-radius:14px;
-                background:rgba(0,234,255,.03);
-            ">
-
-                <div style="
-                    margin:10px;
-                    color:#75a5b7;
-                ">
-                    LATITUDE
-                    <strong
-                        style="
-                            color:#00eaff;
-                            display:block;
-                            margin-top:5px;
-                        "
-                    >
-                        ${latitude}
-                    </strong>
-                </div>
-
-                <div style="
-                    margin:10px;
-                    color:#75a5b7;
-                ">
-                    LONGITUDE
-                    <strong
-                        style="
-                            color:#00eaff;
-                            display:block;
-                            margin-top:5px;
-                        "
-                    >
-                        ${longitude}
-                    </strong>
-                </div>
-
-            </div>
-
-            <button
-                id="refreshLocation"
-                class="command-button"
-                style="max-width:220px;"
-                type="button"
-            >
-                📍 REFRESH GPS
-            </button>
-
-        </div>
-        `
-    );
-
-
-    const refresh =
-        document.getElementById(
-            "refreshLocation"
-        );
-
-    if(refresh){
-
-        refresh.addEventListener(
-            "click",
-            () => {
-
-                requestLocation();
-
-                openLocation();
-
+                return;
             }
-        );
 
-    }
 
+            const latitude =
+                location.latitude;
+
+            const longitude =
+                location.longitude;
+
+
+            const mapURL =
+                `https://www.google.com/maps?q=${latitude},${longitude}`;
+
+
+            openModule(
+                "JARVISH LOCATION",
+                `
+                <div class="jarvish-module">
+
+                    <div class="module-big-icon">
+                        📍
+                    </div>
+
+                    <div class="module-main-value">
+                        GPS ACTIVE
+                    </div>
+
+                    <div class="module-info">
+                        Latitude:
+                        ${latitude.toFixed(6)}
+                        <br>
+                        Longitude:
+                        ${longitude.toFixed(6)}
+                        <br>
+                        Accuracy:
+                        ${Math.round(location.accuracy)} m
+                    </div>
+
+                    <button
+                        class="module-action"
+                        onclick="window.open('${mapURL}','_blank')"
+                    >
+                        OPEN LOCATION
+                    </button>
+
+                </div>
+                `
+            );
+
+        },
+        500
+    );
 }
 
 
@@ -2629,14 +2637,11 @@ function openLocation(){
    WEATHER
    ========================================================= */
 
-async function loadWeather(){
+async function loadWeather() {
 
-    if(state.weatherLoading){
-        return;
-    }
-
-
-    if(!navigator.geolocation){
+    if (
+        state.weatherLoading
+    ) {
         return;
     }
 
@@ -2645,236 +2650,204 @@ async function loadWeather(){
         true;
 
 
-    navigator.geolocation.getCurrentPosition(
+    try {
 
-        async position => {
+        let latitude =
+            23.0225;
 
-            const lat =
-                position.coords.latitude;
-
-            const lon =
-                position.coords.longitude;
+        let longitude =
+            72.5714;
 
 
-            try{
+        if (
+            window.jarvishLocation
+        ) {
 
-                const url =
-                    "https://api.open-meteo.com/v1/forecast" +
-                    `?latitude=${lat}` +
-                    `&longitude=${lon}` +
-                    "&current=" +
-                    [
-                        "temperature_2m",
-                        "relative_humidity_2m",
-                        "surface_pressure",
-                        "wind_speed_10m",
-                        "cloud_cover"
-                    ].join(",");
+            latitude =
+                window.jarvishLocation.latitude;
 
-
-                const response =
-                    await fetch(url);
-
-
-                if(!response.ok){
-                    throw new Error(
-                        "Weather request failed"
-                    );
-                }
-
-
-                const data =
-                    await response.json();
-
-
-                const current =
-                    data.current;
-
-
-                if(el.temperatureValue){
-
-                    el.temperatureValue.textContent =
-                        `${current.temperature_2m} °C`;
-
-                }
-
-
-                if(el.humidityValue){
-
-                    el.humidityValue.textContent =
-                        `${current.relative_humidity_2m} %`;
-
-                }
-
-
-                window.jarvishWeather =
-                    current;
-
-
-            }catch(error){
-
-                console.warn(
-                    "Weather:",
-                    error
-                );
-
-            }
-
-
-            state.weatherLoading =
-                false;
-
-        },
-
-        () => {
-
-            state.weatherLoading =
-                false;
-
-        },
-
-        {
-            enableHighAccuracy:false,
-            timeout:8000,
-            maximumAge:60000
+            longitude =
+                window.jarvishLocation.longitude;
         }
 
-    );
 
+        const url =
+            "https://api.open-meteo.com/v1/forecast" +
+            `?latitude=${latitude}` +
+            `&longitude=${longitude}` +
+            "&current=temperature_2m,relative_humidity_2m,surface_pressure,wind_speed_10m,cloud_cover,precipitation,rain";
+
+
+        const response =
+            await fetch(url);
+
+
+        if (!response.ok) {
+            throw new Error(
+                "Weather request failed"
+            );
+        }
+
+
+        const data =
+            await response.json();
+
+
+        const current =
+            data.current;
+
+
+        if (el.temperatureValue) {
+
+            el.temperatureValue.textContent =
+                `${current.temperature_2m}°C`;
+        }
+
+
+        if (el.humidityValue) {
+
+            el.humidityValue.textContent =
+                `${current.relative_humidity_2m}%`;
+        }
+
+
+        if (el.aqiValue) {
+
+            el.aqiValue.textContent =
+                "--";
+        }
+
+
+        return current;
+
+
+    } catch (error) {
+
+        console.error(
+            "Weather error:",
+            error
+        );
+
+        return null;
+
+    } finally {
+
+        state.weatherLoading =
+            false;
+    }
 }
 
 
 /* =========================================================
-   WEATHER MODULE
+   OPEN WEATHER
    ========================================================= */
 
-async function openWeather(){
+async function openWeather() {
+
+    const weather =
+        await loadWeather();
+
+
+    if (!weather) {
+
+        openModule(
+            "JARVISH WEATHER",
+            `
+            <div class="jarvish-module">
+
+                <div class="module-big-icon">
+                    🌤️
+                </div>
+
+                <div class="module-main-value">
+                    WEATHER UNAVAILABLE
+                </div>
+
+                <div class="module-info">
+                    Please check your internet connection.
+                </div>
+
+            </div>
+            `
+        );
+
+        return;
+    }
+
 
     openModule(
-        "LIVE WEATHER",
+        "JARVISH WEATHER",
         `
-        <div style="
-            height:100%;
-            display:flex;
-            align-items:center;
-            justify-content:center;
-            text-align:center;
-        ">
+        <div class="jarvish-module">
 
-            <div>
-                <div style="
-                    font-size:70px;
-                ">
-                    🌦️
-                </div>
+            <div class="module-big-icon">
+                🌤️
+            </div>
 
-                <div style="
-                    margin-top:15px;
-                    color:#00eaff;
-                    letter-spacing:3px;
-                ">
-                    WEATHER DATA
-                </div>
+            <div class="module-main-value">
+                ${weather.temperature_2m}°C
+            </div>
 
-                <div
-                    id="weatherModuleData"
-                    style="
-                        margin-top:20px;
-                        color:#75a5b7;
-                        line-height:2;
-                    "
-                >
-                    Loading current weather...
-                </div>
+            <div class="module-info">
+
+                Humidity:
+                ${weather.relative_humidity_2m}%
+
+                <br>
+
+                Pressure:
+                ${weather.surface_pressure} hPa
+
+                <br>
+
+                Wind:
+                ${weather.wind_speed_10m} km/h
+
+                <br>
+
+                Cloud:
+                ${weather.cloud_cover}%
+
+                <br>
+
+                Rain:
+                ${weather.rain} mm
 
             </div>
 
         </div>
         `
     );
-
-
-    await loadWeather();
-
-
-    const weather =
-        window.jarvishWeather;
-
-
-    const target =
-        document.getElementById(
-            "weatherModuleData"
-        );
-
-
-    if(
-        weather &&
-        target
-    ){
-
-        target.innerHTML = `
-
-            Temperature:
-            <strong style="color:#00eaff;">
-                ${weather.temperature_2m} °C
-            </strong>
-            <br>
-
-            Humidity:
-            <strong style="color:#00eaff;">
-                ${weather.relative_humidity_2m} %
-            </strong>
-            <br>
-
-            Pressure:
-            <strong style="color:#00eaff;">
-                ${weather.surface_pressure} hPa
-            </strong>
-            <br>
-
-            Wind:
-            <strong style="color:#00eaff;">
-                ${weather.wind_speed_10m} km/h
-            </strong>
-            <br>
-
-            Cloud:
-            <strong style="color:#00eaff;">
-                ${weather.cloud_cover} %
-            </strong>
-
-        `;
-
-    }else if(target){
-
-        target.textContent =
-            "Weather data unavailable.";
-
-    }
-
 }
 
 
 /* =========================================================
-   EXTERNAL LINK
+   EXTERNAL LINKS
    ========================================================= */
 
 function openExternal(
-    url,
-    name
-){
+    url
+) {
 
-    speak(
-        `${name} opening.`
-    );
+    if (!url) {
+        return;
+    }
 
 
-    window.open(
-        url,
-        "_blank",
-        "noopener,noreferrer"
-    );
+    const opened =
+        window.open(
+            url,
+            "_blank",
+            "noopener,noreferrer"
+        );
 
+
+    if (!opened) {
+
+        showNotification(
+            "Popup blocked. Please allow popups."
+        );
+    }
 }
 
 
@@ -2882,7 +2855,7 @@ function openExternal(
    TIME
    ========================================================= */
 
-function tellTime(){
+function tellTime() {
 
     const now =
         new Date();
@@ -2890,47 +2863,32 @@ function tellTime(){
 
     const time =
         now.toLocaleTimeString(
-            [],
+            state.language,
             {
-                hour:"numeric",
-                minute:"2-digit"
+                hour:
+                    "2-digit",
+
+                minute:
+                    "2-digit"
             }
         );
 
 
-    let message;
-
-
-    if(
-        state.language ===
-        "hi-IN"
-    ){
-
-        message =
-            `अभी समय ${time} है।`;
-
-    }else if(
-        state.language ===
-        "gu-IN"
-    ){
-
-        message =
-            `હમણાં સમય ${time} છે.`;
-
-    }else{
-
-        message =
-            `The current time is ${time}.`;
-
-    }
-
-
-    speak(message);
-
+    speak(
+        getLanguageText(
+            "timeIs"
+        ) +
+        " " +
+        time
+    );
 }
 
 
-function tellDate(){
+/* =========================================================
+   DATE
+   ========================================================= */
+
+function tellDate() {
 
     const now =
         new Date();
@@ -2938,45 +2896,30 @@ function tellDate(){
 
     const date =
         now.toLocaleDateString(
-            undefined,
+            state.language,
             {
-                weekday:"long",
-                year:"numeric",
-                month:"long",
-                day:"numeric"
+                weekday:
+                    "long",
+
+                year:
+                    "numeric",
+
+                month:
+                    "long",
+
+                day:
+                    "numeric"
             }
         );
 
 
-    let message;
-
-
-    if(
-        state.language ===
-        "hi-IN"
-    ){
-
-        message =
-            `आज ${date} है।`;
-
-    }else if(
-        state.language ===
-        "gu-IN"
-    ){
-
-        message =
-            `આજે ${date} છે.`;
-
-    }else{
-
-        message =
-            `Today is ${date}.`;
-
-    }
-
-
-    speak(message);
-
+    speak(
+        getLanguageText(
+            "dateIs"
+        ) +
+        " " +
+        date
+    );
 }
 
 
@@ -2984,81 +2927,104 @@ function tellDate(){
    SPEECH SYNTHESIS
    ========================================================= */
 
-function speak(text){
+function speak(
+    text
+) {
 
-    if(!text){
+    if (!text) {
         return;
     }
 
 
-    if(el.replyText){
+    if (el.replyText) {
 
         el.replyText.textContent =
             text;
-
     }
 
 
-    if(!state.speechSupported){
+    if (
+        !state.speechSupported
+    ) {
+
         return;
     }
 
 
-    window.speechSynthesis.cancel();
+    try {
+
+        speechSynthesis.cancel();
 
 
-    const utterance =
-        new SpeechSynthesisUtterance(
-            text
+        const utterance =
+            new SpeechSynthesisUtterance(
+                text
+            );
+
+
+        utterance.lang =
+            state.language;
+
+        utterance.rate =
+            0.95;
+
+        utterance.pitch =
+            0.9;
+
+        utterance.volume =
+            1;
+
+
+        utterance.onstart =
+            function () {
+
+                state.speaking =
+                    true;
+
+                if (el.systemVoice) {
+                    el.systemVoice.textContent =
+                        "SPEAKING";
+                }
+            };
+
+
+        utterance.onend =
+            function () {
+
+                state.speaking =
+                    false;
+
+                if (el.systemVoice) {
+                    el.systemVoice.textContent =
+                        "READY";
+                }
+            };
+
+
+        utterance.onerror =
+            function () {
+
+                state.speaking =
+                    false;
+
+                if (el.systemVoice) {
+                    el.systemVoice.textContent =
+                        "READY";
+                }
+            };
+
+
+        speechSynthesis.speak(
+            utterance
         );
 
+    } catch (error) {
 
-    utterance.lang =
-        state.language;
-
-
-    utterance.rate =
-        .95;
-
-
-    utterance.pitch =
-        .9;
-
-
-    utterance.volume =
-        1;
-
-
-    utterance.onstart =
-        () => {
-
-            state.speaking =
-                true;
-
-            setCoreStatus(
-                "JARVISH SPEAKING"
-            );
-
-        };
-
-
-    utterance.onend =
-        () => {
-
-            state.speaking =
-                false;
-
-            setCoreStatus(
-                "JARVISH READY"
-            );
-
-        };
-
-
-    window.speechSynthesis.speak(
-        utterance
-    );
-
+        console.error(
+            "Speech synthesis error:",
+            error
+        );
+    }
 }
 
 
@@ -3066,80 +3032,431 @@ function speak(text){
    WELCOME
    ========================================================= */
 
-function speakWelcome(){
+function speakWelcome() {
 
-    setTimeout(
-        () => {
-
-            speak(
-                getText(
-                    "welcome"
-                )
-            );
-
-        },
-        700
+    speak(
+        getLanguageText(
+            "welcome"
+        )
     );
-
 }
 
 
 /* =========================================================
-   CORE STATUS
+   LANGUAGE TEXT
    ========================================================= */
 
-function setCoreStatus(text){
+function getLanguageText(
+    key
+) {
 
-    if(el.coreStatusText){
+    const text = {
+
+        en: {
+
+            welcome:
+                "Hello. I am JARVISH. Voice system is ready.",
+
+            hello:
+                "Hello. How can I help you?",
+
+            listening:
+                "I am listening.",
+
+            starting:
+                "Listening.",
+
+            unknown:
+                "Sorry, I did not understand that command.",
+
+            languageChanged:
+                "language selected.",
+
+            microphoneDenied:
+                "Microphone permission was denied. Please allow microphone access.",
+
+            microphoneError:
+                "I cannot access the microphone.",
+
+            networkError:
+                "Voice recognition network service is unavailable.",
+
+            voiceUnavailable:
+                "Voice recognition is not supported in this browser.",
+
+            commandError:
+                "There was a problem executing that command.",
+
+            mapOpening:
+                "Opening map.",
+
+            compassOpening:
+                "Opening compass.",
+
+            sirenStarted:
+                "Siren activated.",
+
+            sirenStopped:
+                "Siren stopped.",
+
+            flashlightOn:
+                "Flashlight turned on.",
+
+            flashlightOff:
+                "Flashlight turned off.",
+
+            flashlightUnsupported:
+                "Hardware flashlight control is not supported on this device.",
+
+            cameraStarted:
+                "Opening camera.",
+
+            cameraDenied:
+                "Camera permission was denied or unavailable.",
+
+            locationOpening:
+                "Opening your location.",
+
+            weatherOpening:
+                "Opening weather information.",
+
+            qrOpening:
+                "Opening QR generator.",
+
+            youtubeOpening:
+                "Opening YouTube.",
+
+            whatsappOpening:
+                "Opening WhatsApp.",
+
+            googleOpening:
+                "Opening Google.",
+
+            timeIs:
+                "The current time is",
+
+            dateIs:
+                "Today's date is",
+
+            historyCleared:
+                "Command history cleared."
+        },
+
+
+        hi: {
+
+            welcome:
+                "नमस्ते। मैं JARVISH हूँ। वॉइस सिस्टम तैयार है।",
+
+            hello:
+                "नमस्ते। मैं आपकी कैसे मदद करूँ?",
+
+            listening:
+                "मैं सुन रहा हूँ।",
+
+            starting:
+                "सुन रहा हूँ।",
+
+            unknown:
+                "माफ़ कीजिए, मैं इस कमांड को समझ नहीं पाया।",
+
+            languageChanged:
+                "भाषा चुनी गई है।",
+
+            microphoneDenied:
+                "माइक्रोफोन की अनुमति नहीं है। कृपया माइक्रोफोन की अनुमति दें।",
+
+            microphoneError:
+                "मैं माइक्रोफोन को एक्सेस नहीं कर पा रहा हूँ।",
+
+            networkError:
+                "वॉइस रिकग्निशन नेटवर्क उपलब्ध नहीं है।",
+
+            voiceUnavailable:
+                "इस ब्राउज़र में वॉइस रिकग्निशन उपलब्ध नहीं है।",
+
+            commandError:
+                "कमांड चलाने में समस्या हुई।",
+
+            mapOpening:
+                "मैप खोल रहा हूँ।",
+
+            compassOpening:
+                "कंपास खोल रहा हूँ।",
+
+            sirenStarted:
+                "सायरन चालू कर दिया गया है।",
+
+            sirenStopped:
+                "सायरन बंद कर दिया गया है।",
+
+            flashlightOn:
+                "फ्लैशलाइट चालू कर दी गई है।",
+
+            flashlightOff:
+                "फ्लैशलाइट बंद कर दी गई है।",
+
+            flashlightUnsupported:
+                "इस डिवाइस में हार्डवेयर फ्लैशलाइट कंट्रोल उपलब्ध नहीं है।",
+
+            cameraStarted:
+                "कैमरा खोल रहा हूँ।",
+
+            cameraDenied:
+                "कैमरा की अनुमति नहीं मिली।",
+
+            locationOpening:
+                "आपकी लोकेशन खोल रहा हूँ।",
+
+            weatherOpening:
+                "मौसम की जानकारी खोल रहा हूँ।",
+
+            qrOpening:
+                "QR जनरेटर खोल रहा हूँ।",
+
+            youtubeOpening:
+                "YouTube खोल रहा हूँ।",
+
+            whatsappOpening:
+                "WhatsApp खोल रहा हूँ।",
+
+            googleOpening:
+                "Google खोल रहा हूँ।",
+
+            timeIs:
+                "अभी समय है",
+
+            dateIs:
+                "आज की तारीख है",
+
+            historyCleared:
+                "कमांड हिस्ट्री साफ कर दी गई है।"
+        },
+
+
+        gu: {
+
+            welcome:
+                "નમસ્તે. હું JARVISH છું. વોઇસ સિસ્ટમ તૈયાર છે.",
+
+            hello:
+                "નમસ્તે. હું તમારી કેવી રીતે મદદ કરી શકું?",
+
+            listening:
+                "હું સાંભળી રહ્યો છું.",
+
+            starting:
+                "સાંભળી રહ્યો છું.",
+
+            unknown:
+                "માફ કરશો, હું આ કમાન્ડ સમજી શક્યો નથી.",
+
+            languageChanged:
+                "ભાષા પસંદ કરવામાં આવી છે.",
+
+            microphoneDenied:
+                "માઇક્રોફોનની પરવાનગી નથી. કૃપા કરીને માઇક્રોફોનની પરવાનગી આપો.",
+
+            microphoneError:
+                "હું માઇક્રોફોન ઍક્સેસ કરી શકતો નથી.",
+
+            networkError:
+                "વોઇસ રિકગ્નિશન નેટવર્ક ઉપલબ્ધ નથી.",
+
+            voiceUnavailable:
+                "આ બ્રાઉઝરમાં વોઇસ રિકગ્નિશન ઉપલબ્ધ નથી.",
+
+            commandError:
+                "કમાન્ડ ચલાવવામાં સમસ્યા આવી.",
+
+            mapOpening:
+                "મેપ ખોલી રહ્યો છું.",
+
+            compassOpening:
+                "કંપાસ ખોલી રહ્યો છું.",
+
+            sirenStarted:
+                "સાયરન ચાલુ કરી દીધું છે.",
+
+            sirenStopped:
+                "સાયરન બંધ કરી દીધું છે.",
+
+            flashlightOn:
+                "ફ્લેશલાઇટ ચાલુ કરી દીધી છે.",
+
+            flashlightOff:
+                "ફ્લેશલાઇટ બંધ કરી દીધી છે.",
+
+            flashlightUnsupported:
+                "આ ડિવાઇસમાં હાર્ડવેર ફ્લેશલાઇટ કંટ્રોલ ઉપલબ્ધ નથી.",
+
+            cameraStarted:
+                "કેમેરા ખોલી રહ્યો છું.",
+
+            cameraDenied:
+                "કેમેરાની પરવાનગી મળી નથી.",
+
+            locationOpening:
+                "તમારી લોકેશન ખોલી રહ્યો છું.",
+
+            weatherOpening:
+                "હવામાનની માહિતી ખોલી રહ્યો છું.",
+
+            qrOpening:
+                "QR જનરેટર ખોલી રહ્યો છું.",
+
+            youtubeOpening:
+                "YouTube ખોલી રહ્યો છું.",
+
+            whatsappOpening:
+                "WhatsApp ખોલી રહ્યો છું.",
+
+            googleOpening:
+                "Google ખોલી રહ્યો છું.",
+
+            timeIs:
+                "હાલનો સમય છે",
+
+            dateIs:
+                "આજની તારીખ છે",
+
+            historyCleared:
+                "કમાન્ડ હિસ્ટ્રી સાફ કરી દીધી છે."
+        }
+    };
+
+
+    if (
+        state.language ===
+        "hi-IN"
+    ) {
+        return text.hi[key] ||
+            text.en[key];
+    }
+
+
+    if (
+        state.language ===
+        "gu-IN"
+    ) {
+        return text.gu[key] ||
+            text.en[key];
+    }
+
+
+    return text.en[key];
+}
+
+
+/* =========================================================
+   SYSTEM STATUS
+   ========================================================= */
+
+function updateSystemStatus() {
+
+    if (el.systemAI) {
+
+        el.systemAI.textContent =
+            window.JARVISH_BRAIN
+                ? "READY"
+                : "FALLBACK";
+    }
+
+
+    if (el.systemVoice) {
+
+        el.systemVoice.textContent =
+            state.recognition
+                ? "READY"
+                : "UNAVAILABLE";
+    }
+
+
+    if (el.micStatus) {
+
+        el.micStatus.textContent =
+            state.recognition
+                ? "STANDBY"
+                : "UNAVAILABLE";
+    }
+}
+
+
+function setCoreStatus(
+    text
+) {
+
+    if (el.coreStatusText) {
 
         el.coreStatusText.textContent =
             text;
-
     }
 
+    if (el.aiCoreStatus) {
+
+        el.aiCoreStatus.textContent =
+            text;
+    }
 }
 
 
 /* =========================================================
-   NOTIFICATION
+   LISTENING UI
    ========================================================= */
 
-function showNotification(text){
+function updateListeningUI(
+    listening
+) {
 
-    if(
-        !el.notification ||
-        !el.notificationText
-    ){
-        return;
+    if (el.micButton) {
+
+        el.micButton.classList.toggle(
+            "active",
+            listening
+        );
+
+        el.micButton.classList.toggle(
+            "listening",
+            listening
+        );
     }
 
 
-    el.notificationText.textContent =
-        text;
+    if (el.aiCore) {
 
-
-    el.notification.classList.add(
-        "show"
-    );
-
-
-    clearTimeout(
-        showNotification.timer
-    );
-
-
-    showNotification.timer =
-        setTimeout(
-            () => {
-
-                el.notification.classList.remove(
-                    "show"
-                );
-
-            },
-            2500
+        el.aiCore.classList.toggle(
+            "listening",
+            listening
         );
+    }
 
+
+    if (el.listeningIndicator) {
+
+        el.listeningIndicator.classList.toggle(
+            "active",
+            listening
+        );
+    }
+
+
+    if (el.micStatus) {
+
+        el.micStatus.textContent =
+            listening
+                ? "LISTENING"
+                : "STANDBY";
+    }
+
+
+    if (listening) {
+
+        setCoreStatus(
+            getLanguageText(
+                "listening"
+            )
+        );
+    }
 }
 
 
@@ -3147,110 +3464,39 @@ function showNotification(text){
    HISTORY
    ========================================================= */
 
-function addHistory(command){
+function addHistory(
+    text
+) {
 
     state.history.unshift({
-
-        text:command,
-
+        text,
         time:
-            new Date()
-                .toLocaleTimeString(
-                    [],
-                    {
-                        hour:"2-digit",
-                        minute:"2-digit"
-                    }
-                )
-
+            new Date().toLocaleTimeString()
     });
 
 
-    if(
-        state.history.length > 30
-    ){
-
-        state.history =
-            state.history.slice(
-                0,
-                30
-            );
-
-    }
+    state.history =
+        state.history.slice(
+            0,
+            30
+        );
 
 
-    saveHistory();
+    localStorage.setItem(
+        "jarvish_history",
+        JSON.stringify(
+            state.history
+        )
+    );
+
 
     renderHistory();
-
 }
 
 
-function renderHistory(){
+function restoreHistory() {
 
-    if(!el.historyList){
-        return;
-    }
-
-
-    if(!state.history.length){
-
-        el.historyList.innerHTML =
-            `
-            <div class="history-empty">
-                No commands yet
-            </div>
-            `;
-
-        return;
-
-    }
-
-
-    el.historyList.innerHTML =
-        state.history
-            .map(item => `
-                <div class="history-entry">
-                    <span>
-                        ${escapeHTML(item.text)}
-                    </span>
-
-                    <small>
-                        ${escapeHTML(item.time)}
-                    </small>
-                </div>
-            `)
-            .join("");
-
-}
-
-
-function saveHistory(){
-
-    try{
-
-        localStorage.setItem(
-            "jarvish_history",
-            JSON.stringify(
-                state.history
-            )
-        );
-
-    }catch(error){
-
-        console.warn(
-            "History save failed:",
-            error
-        );
-
-    }
-
-}
-
-
-function restoreHistory(){
-
-    try{
+    try {
 
         const saved =
             localStorage.getItem(
@@ -3258,45 +3504,102 @@ function restoreHistory(){
             );
 
 
-        if(saved){
+        if (saved) {
 
             state.history =
-                JSON.parse(saved);
-
+                JSON.parse(
+                    saved
+                );
         }
 
-    }catch(error){
+    } catch (error) {
+
+        console.warn(
+            "History restore error:",
+            error
+        );
 
         state.history =
             [];
-
     }
 
 
     renderHistory();
-
 }
 
 
-function clearCommandHistory(){
+function renderHistory() {
+
+    if (!el.historyList) {
+        return;
+    }
+
+
+    if (
+        state.history.length === 0
+    ) {
+
+        el.historyList.innerHTML =
+            `
+            <div>
+                No command history
+            </div>
+            `;
+
+        return;
+    }
+
+
+    el.historyList.innerHTML =
+        state.history
+            .map(
+                item =>
+                    `
+                    <div class="history-item">
+
+                        <div>
+                            ${escapeHTML(item.text)}
+                        </div>
+
+                        <small>
+                            ${escapeHTML(item.time)}
+                        </small>
+
+                    </div>
+                    `
+            )
+            .join("");
+}
+
+
+function clearCommandHistory() {
 
     state.history =
         [];
 
-    saveHistory();
+    localStorage.removeItem(
+        "jarvish_history"
+    );
 
     renderHistory();
 
-    showNotification(
-        "COMMAND HISTORY CLEARED"
+    speak(
+        getLanguageText(
+            "historyCleared"
+        )
     );
-
 }
 
 
-function escapeHTML(text){
+/* =========================================================
+   ESCAPE HTML
+   ========================================================= */
 
-    return String(text)
+function escapeHTML(
+    value
+) {
+
+    return String(value)
         .replace(
             /&/g,
             "&amp;"
@@ -3317,333 +3620,191 @@ function escapeHTML(text){
             /'/g,
             "&#039;"
         );
-
 }
 
 
 /* =========================================================
-   MULTILINGUAL RESPONSES
+   NOTIFICATION
    ========================================================= */
 
-function getText(key){
+function showNotification(
+    message
+) {
 
-    const text = {
+    if (!el.notification) {
+        return;
+    }
 
-        welcome:{
 
-            "en-IN":
-                "JARVISH online. I am ready for your command.",
+    if (el.notificationText) {
 
-            "hi-IN":
-                "जारविश ऑनलाइन है। मैं आपके आदेश के लिए तैयार हूँ।",
+        el.notificationText.textContent =
+            message;
+    }
 
-            "gu-IN":
-                "જારવિશ ઓનલાઈન છે. હું તમારા આદેશ માટે તૈયાર છું."
 
-        },
-
-
-        yesSir:{
-
-            "en-IN":
-                "Yes. How can I help you?",
-
-            "hi-IN":
-                "जी। मैं आपकी क्या सहायता करूँ?",
-
-            "gu-IN":
-                "જી. હું તમારી કેવી રીતે મદદ કરી શકું?"
-
-        },
-
-
-        hello:{
-
-            "en-IN":
-                "Hello. JARVISH is ready.",
-
-            "hi-IN":
-                "नमस्ते। जारविश तैयार है।",
-
-            "gu-IN":
-                "નમસ્તે. જારવિશ તૈયાર છે."
-
-        },
-
-
-        listening:{
-
-            "en-IN":
-                "Listening.",
-
-            "hi-IN":
-                "मैं सुन रहा हूँ।",
-
-            "gu-IN":
-                "હું સાંભળી રહ્યો છું."
-
-        },
-
-
-        unknown:{
-
-            "en-IN":
-                "I did not understand that command.",
-
-            "hi-IN":
-                "मैं उस आदेश को समझ नहीं पाया।",
-
-            "gu-IN":
-                "હું આ આદેશ સમજી શક્યો નથી."
-
-        },
-
-
-        languageChanged:{
-
-            "en-IN":
-                "Language changed.",
-
-            "hi-IN":
-                "भाषा बदल दी गई है।",
-
-            "gu-IN":
-                "ભાષા બદલી દેવામાં આવી છે."
-
-        },
-
-
-        microphoneDenied:{
-
-            "en-IN":
-                "Microphone permission is required.",
-
-            "hi-IN":
-                "माइक्रोफोन की अनुमति आवश्यक है।",
-
-            "gu-IN":
-                "માઇક્રોફોનની પરવાનગી જરૂરી છે."
-
-        },
-
-
-        voiceUnavailable:{
-
-            "en-IN":
-                "Voice recognition is not available in this browser.",
-
-            "hi-IN":
-                "इस ब्राउज़र में वॉइस रिकग्निशन उपलब्ध नहीं है।",
-
-            "gu-IN":
-                "આ બ્રાઉઝરમાં વૉઇસ રેકગ્નિશન ઉપલબ્ધ નથી."
-
-        },
-
-
-        mapOpening:{
-
-            "en-IN":
-                "Opening the internal map.",
-
-            "hi-IN":
-                "इंटरनल मैप खोल रहा हूँ।",
-
-            "gu-IN":
-                "ઇન્ટરનલ મેપ ખોલી રહ્યો છું."
-
-        },
-
-
-        compassOpening:{
-
-            "en-IN":
-                "Opening digital compass.",
-
-            "hi-IN":
-                "डिजिटल कंपास खोल रहा हूँ।",
-
-            "gu-IN":
-                "ડિજિટલ કંપાસ ખોલી રહ્યો છું."
-
-        },
-
-
-        sirenStarted:{
-
-            "en-IN":
-                "Emergency siren activated.",
-
-            "hi-IN":
-                "इमरजेंसी सायरन सक्रिय है।",
-
-            "gu-IN":
-                "ઇમરજન્સી સાયરન સક્રિય છે."
-
-        },
-
-
-        sirenStopped:{
-
-            "en-IN":
-                "Emergency siren stopped.",
-
-            "hi-IN":
-                "इमरजेंसी सायरन बंद कर दिया गया है।",
-
-            "gu-IN":
-                "ઇમરજન્સી સાયરન બંધ કરવામાં આવ્યું છે."
-
-        },
-
-
-        flashlightOn:{
-
-            "en-IN":
-                "Flashlight turned on.",
-
-            "hi-IN":
-                "फ्लैशलाइट चालू है।",
-
-            "gu-IN":
-                "ફ્લેશલાઇટ ચાલુ છે."
-
-        },
-
-
-        flashlightOff:{
-
-            "en-IN":
-                "Flashlight turned off.",
-
-            "hi-IN":
-                "फ्लैशलाइट बंद है।",
-
-            "gu-IN":
-                "ફ્લેશલાઇટ બંધ છે."
-
-        },
-
-
-        flashlightUnsupported:{
-
-            "en-IN":
-                "This device or browser does not support flashlight control.",
-
-            "hi-IN":
-                "इस डिवाइस या ब्राउज़र में फ्लैशलाइट कंट्रोल सपोर्ट नहीं है।",
-
-            "gu-IN":
-                "આ ડિવાઇસ અથવા બ્રાઉઝરમાં ફ્લેશલાઇટ કંટ્રોલ સપોર્ટ નથી."
-
-        },
-
-
-        cameraStarted:{
-
-            "en-IN":
-                "Camera activated.",
-
-            "hi-IN":
-                "कैमरा सक्रिय है।",
-
-            "gu-IN":
-                "કેમેરા સક્રિય છે."
-
-        },
-
-
-        cameraDenied:{
-
-            "en-IN":
-                "Camera permission is required.",
-
-            "hi-IN":
-                "कैमरा अनुमति आवश्यक है।",
-
-            "gu-IN":
-                "કેમેરાની પરવાનગી જરૂરી છે."
-
-        }
-
-    };
-
-
-    return (
-        text[key]?.[state.language] ||
-        text[key]?.["en-IN"] ||
-        ""
+    el.notification.classList.add(
+        "active"
     );
 
+
+    setTimeout(
+        function () {
+
+            el.notification.classList.remove(
+                "active"
+            );
+
+        },
+        3000
+    );
 }
 
 
 /* =========================================================
-   KEYBOARD SHORTCUT
+   SYSTEM STATUS VOICE
+   ========================================================= */
+
+function speakSystemStatus() {
+
+    const brain =
+        window.JARVISH_BRAIN
+            ? "AI brain ready"
+            : "fallback brain active";
+
+
+    const voice =
+        state.recognition
+            ? "voice recognition ready"
+            : "voice recognition unavailable";
+
+
+    const gps =
+        window.jarvishLocation
+            ? "GPS ready"
+            : "GPS waiting";
+
+
+    speak(
+        "System status. " +
+        brain +
+        ". " +
+        voice +
+        ". " +
+        gps +
+        "."
+    );
+}
+
+
+/* =========================================================
+   STOP ALL MODULES
+   ========================================================= */
+
+function stopAllModules() {
+
+    stopSiren();
+
+    stopCamera();
+
+    stopCompass();
+
+    if (
+        state.recognition &&
+        state.listening
+    ) {
+
+        state.manualStop =
+            true;
+
+        try {
+            state.recognition.stop();
+        } catch (error) {
+            console.warn(error);
+        }
+    }
+
+
+    if (
+        "speechSynthesis" in window
+    ) {
+
+        speechSynthesis.cancel();
+    }
+
+
+    state.speaking =
+        false;
+
+    state.listening =
+        false;
+
+    closeModule();
+
+    updateListeningUI(
+        false
+    );
+
+    setCoreStatus(
+        "JARVISH READY"
+    );
+
+
+    speak(
+        getLanguageText(
+            "stop"
+        ) ||
+        "All active modules stopped."
+    );
+}
+
+
+/* =========================================================
+   KEYBOARD CONTROL
    ========================================================= */
 
 document.addEventListener(
     "keydown",
-    event => {
+    function (event) {
 
-        if(
+        if (
             event.code ===
             "Space" &&
-            !isTypingElement(
-                event.target
-            )
-        ){
+            !event.repeat
+        ) {
 
-            event.preventDefault();
+            const target =
+                event.target;
 
-            toggleListening();
+            const tag =
+                target &&
+                target.tagName
+                    ? target.tagName.toLowerCase()
+                    : "";
 
+
+            if (
+                tag !== "input" &&
+                tag !== "textarea" &&
+                tag !== "button"
+            ) {
+
+                event.preventDefault();
+
+                toggleListening();
+            }
         }
 
 
-        if(
-            event.code ===
+        if (
+            event.key ===
             "Escape"
-        ){
+        ) {
 
             closeModule();
-
         }
-
     }
 );
-
-
-function isTypingElement(element){
-
-    if(!element){
-        return false;
-    }
-
-    const tag =
-        element.tagName;
-
-    return (
-        tag === "INPUT" ||
-        tag === "TEXTAREA" ||
-        tag === "SELECT"
-    );
-
-}
-
-
-/* =========================================================
-   CORE CLICK
-   ========================================================= */
-
-if(el.aiCore){
-
-    el.aiCore.addEventListener(
-        "click",
-        toggleListening
-    );
-
-}
 
 
 /* =========================================================
@@ -3665,9 +3826,14 @@ window.JARVISH = {
 
     openSiren,
 
+    stopSiren,
+
     toggleFlashlight,
 
     openCamera,
+
+    closeCamera:
+        stopCamera,
 
     openLocation,
 
@@ -3677,121 +3843,21 @@ window.JARVISH = {
 
     tellDate,
 
-    executeCommand,
+    executeCommand:
+        executeBrainCommand,
 
-    closeModule
+    processVoiceCommand,
 
+    closeModule,
+
+    stopAllModules
 };
 
-/* =========================================================
-   SYSTEM STATUS VOICE
-   ========================================================= */
-
-function speakSystemStatus(){
-
-    const gps =
-        el.locationStatus
-            ? el.locationStatus.textContent
-            : "UNKNOWN";
-
-
-    const temperature =
-        el.temperatureValue
-            ? el.temperatureValue.textContent
-            : "--";
-
-
-    const humidity =
-        el.humidityValue
-            ? el.humidityValue.textContent
-            : "--";
-
-
-    let message;
-
-
-    if(state.language === "hi-IN"){
-
-        message =
-            `जारविश सिस्टम ऑनलाइन है। ` +
-            `जीपीएस ${gps} है। ` +
-            `तापमान ${temperature} है। ` +
-            `ह्यूमिडिटी ${humidity} है।`;
-
-    }else if(state.language === "gu-IN"){
-
-        message =
-            `જારવિશ સિસ્ટમ ઓનલાઈન છે. ` +
-            `GPS ${gps} છે. ` +
-            `તાપમાન ${temperature} છે. ` +
-            `હ્યુમિડિટી ${humidity} છે.`;
-
-    }else{
-
-        message =
-            `JARVISH system is online. ` +
-            `GPS is ${gps}. ` +
-            `Temperature is ${temperature}. ` +
-            `Humidity is ${humidity}.`;
-
-    }
-
-
-    speak(message);
-
-}
-
 
 /* =========================================================
-   STOP ALL ACTIVE MODULES
+   FINAL READY MESSAGE
    ========================================================= */
 
-function stopAllModules(){
-
-    stopSiren();
-
-    stopCamera();
-
-    stopCompass();
-
-    if(
-        state.listening &&
-        state.recognition
-    ){
-
-        try{
-            state.recognition.stop();
-        }catch(error){}
-
-    }
-
-
-    if(
-        window.speechSynthesis
-    ){
-
-        window.speechSynthesis.cancel();
-
-    }
-
-
-    closeModule();
-
-
-    setCoreStatus(
-        "JARVISH READY"
-    );
-
-
-    speak(
-        state.language === "hi-IN"
-            ? "सभी सक्रिय मॉड्यूल रोक दिए गए हैं।"
-            : state.language === "gu-IN"
-                ? "બધા સક્રિય મોડ્યુલ બંધ કરવામાં આવ્યા છે."
-                : "All active modules have been stopped."
-    );
-
-}
-/* =========================================================
-   END
-   ========================================================= */
+console.log(
+    "JARVISH Voice System V2 loaded successfully."
+);
