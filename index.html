@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    >
+
+    <title>JARVISH — AI Voice Assistant</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <!-- =====================================================
+         JARVISH MAIN APP
+         ===================================================== -->
+
+    <div id="jarvishApp" class="jarvish-app">
+
+        <!-- Background HUD -->
+        <div class="hud-background">
+            <div class="hud-grid"></div>
+            <div class="hud-scan"></div>
+            <div class="hud-particles"></div>
+        </div>
+
+
+        <!-- =================================================
+             TOP HEADER
+             ================================================= -->
+
+        <header class="top-header">
+
+            <div class="brand-section">
+                <div class="brand-icon">J</div>
+
+                <div class="brand-text">
+                    <h1>JARVISH</h1>
+                    <span>AI VOICE ASSISTANT</span>
+                </div>
+            </div>
+
+
+            <div class="system-status">
+
+                <div class="status-item">
+                    <span class="status-dot online"></span>
+                    <span>SYSTEM ONLINE</span>
+                </div>
+
+                <div class="status-item">
+                    <span>AI CORE</span>
+                    <strong id="aiCoreStatus">READY</strong>
+                </div>
+
+            </div>
+
+        </header>
+
+
+        <!-- =================================================
+             MAIN HUD
+             ================================================= -->
+
+        <main class="main-interface">
+
+
+            <!-- =============================================
+                 LEFT INFORMATION PANEL
+                 ============================================= -->
+
+            <aside class="left-panel">
+
+                <div class="hud-panel">
+
+                    <div class="panel-title">
+                        SYSTEM
+                    </div>
+
+                    <div class="system-row">
+                        <span>AI CORE</span>
+                        <strong id="systemAI">READY</strong>
+                    </div>
+
+                    <div class="system-row">
+                        <span>VOICE</span>
+                        <strong id="systemVoice">READY</strong>
+                    </div>
+
+                    <div class="system-row">
+                        <span>MICROPHONE</span>
+                        <strong id="micStatus">STANDBY</strong>
+                    </div>
+
+                    <div class="system-row">
+                        <span>LOCATION</span>
+                        <strong id="locationStatus">READY</strong>
+                    </div>
+
+                </div>
+
+
+                <div class="hud-panel metrics-panel">
+
+                    <div class="panel-title">
+                        LIVE DATA
+                    </div>
+
+                    <div class="metric-card">
+                        <span>TEMPERATURE</span>
+                        <strong id="temperatureValue">-- °C</strong>
+                    </div>
+
+                    <div class="metric-card">
+                        <span>AQI</span>
+                        <strong id="aqiValue">--</strong>
+                    </div>
+
+                    <div class="metric-card">
+                        <span>HUMIDITY</span>
+                        <strong id="humidityValue">-- %</strong>
+                    </div>
+
+                    <div class="metric-card">
+                        <span>GPS</span>
+                        <strong id="gpsValue">--</strong>
+                    </div>
+
+                </div>
+
+            </aside>
+
+
+            <!-- =============================================
+                 CENTER AI CORE
+                 ============================================= -->
+
+            <section class="center-core">
+
+                <div class="core-status">
+                    <span id="coreStatusText">
+                        JARVISH READY
+                    </span>
+                </div>
+
+
+                <!-- AI CORE -->
+                <div
+                    id="aiCore"
+                    class="ai-core"
+                    aria-label="JARVISH AI Core"
+                >
+
+                    <div class="core-ring ring-1"></div>
+                    <div class="core-ring ring-2"></div>
+                    <div class="core-ring ring-3"></div>
+
+                    <div class="core-energy">
+
+                        <div class="energy-circle">
+                            <span>J</span>
+                        </div>
+
+                    </div>
+
+                    <div class="core-orbit orbit-1"></div>
+                    <div class="core-orbit orbit-2"></div>
+
+                </div>
+
+
+                <!-- Voice text -->
+                <div class="voice-display">
+
+                    <div id="heardText" class="heard-text">
+                        Say "Jarvish" to begin
+                    </div>
+
+                    <div id="replyText" class="reply-text">
+                        I am ready.
+                    </div>
+
+                </div>
+
+
+                <!-- Microphone -->
+                <button
+                    id="micButton"
+                    class="mic-button"
+                    type="button"
+                    aria-label="Activate JARVISH microphone"
+                >
+
+                    <span class="mic-icon">🎙</span>
+
+                    <span class="mic-label">
+                        ACTIVATE
+                    </span>
+
+                </button>
+
+
+                <div class="voice-hint">
+                    Voice Control Active
+                </div>
+
+            </section>
+
+
+            <!-- =============================================
+                 RIGHT CONTROL PANEL
+                 ============================================= -->
+
+            <aside class="right-panel">
+
+                <div class="hud-panel">
+
+                    <div class="panel-title">
+                        COMMAND CENTER
+                    </div>
+
+
+                    <button
+                        class="command-button"
+                        data-command="map"
+                        type="button"
+                    >
+                        <span class="command-icon">🗺️</span>
+                        <span>MAP</span>
+                    </button>
+
+
+                    <button
+                        class="command-button"
+                        data-command="compass"
+                        type="button"
+                    >
+                        <span class="command-icon">🧭</span>
+                        <span>COMPASS</span>
+                    </button>
+
+
+                    <button
+                        class="command-button"
+                        data-command="camera"
+                        type="button"
+                    >
+                        <span class="command-icon">📷</span>
+                        <span>CAMERA</span>
+                    </button>
+
+
+                    <button
+                        class="command-button danger"
+                        data-command="siren"
+                        type="button"
+                    >
+                        <span class="command-icon">🚨</span>
+                        <span>SIREN</span>
+                    </button>
+
+
+                    <button
+                        class="command-button"
+                        data-command="flashlight"
+                        type="button"
+                    >
+                        <span class="command-icon">🔦</span>
+                        <span>FLASHLIGHT</span>
+                    </button>
+
+
+                    <button
+                        class="command-button"
+                        data-command="location"
+                        type="button"
+                    >
+                        <span class="command-icon">📍</span>
+                        <span>LOCATION</span>
+                    </button>
+
+                </div>
+
+
+                <!-- Quick Apps -->
+
+                <div class="hud-panel quick-panel">
+
+                    <div class="panel-title">
+                        QUICK APPS
+                    </div>
+
+                    <button
+                        class="quick-button"
+                        data-command="qr"
+                        type="button"
+                    >
+                        QR GENERATOR
+                    </button>
+
+                    <button
+                        class="quick-button"
+                        data-command="weather"
+                        type="button"
+                    >
+                        WEATHER
+                    </button>
+
+                    <button
+                        class="quick-button"
+                        data-command="youtube"
+                        type="button"
+                    >
+                        YOUTUBE
+                    </button>
+
+                    <button
+                        class="quick-button"
+                        data-command="whatsapp"
+                        type="button"
+                    >
+                        WHATSAPP
+                    </button>
+
+                </div>
+
+            </aside>
+
+        </main>
+
+
+        <!-- =================================================
+             COMMAND HISTORY
+             ================================================= -->
+
+        <section class="command-history">
+
+            <div class="history-header">
+                <span>COMMAND HISTORY</span>
+                <button id="clearHistory" type="button">
+                    CLEAR
+                </button>
+            </div>
+
+            <div
+                id="historyList"
+                class="history-list"
+            >
+
+                <div class="history-empty">
+                    No commands yet
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- =================================================
+             BOTTOM BAR
+             ================================================= -->
+
+        <footer class="bottom-bar">
+
+            <div class="bottom-info">
+                <span>JARVISH CORE</span>
+                <span>•</span>
+                <span id="currentTime">--:--:--</span>
+            </div>
+
+            <div class="language-selector">
+
+                <button
+                    class="language-button active"
+                    data-language="en-IN"
+                    type="button"
+                >
+                    EN
+                </button>
+
+                <button
+                    class="language-button"
+                    data-language="hi-IN"
+                    type="button"
+                >
+                    HI
+                </button>
+
+                <button
+                    class="language-button"
+                    data-language="gu-IN"
+                    type="button"
+                >
+                    GU
+                </button>
+
+            </div>
+
+        </footer>
+
+
+        <!-- =================================================
+             INTERNAL MODULE OVERLAY
+             Map / Compass / Siren / Flashlight / Camera
+             ================================================= -->
+
+        <div
+            id="moduleOverlay"
+            class="module-overlay"
+            aria-hidden="true"
+        >
+
+            <div class="module-window">
+
+                <div class="module-header">
+
+                    <div>
+                        <span class="module-label">
+                            JARVISH MODULE
+                        </span>
+
+                        <h2 id="moduleTitle">
+                            SYSTEM
+                        </h2>
+                    </div>
+
+                    <button
+                        id="closeModule"
+                        class="close-module"
+                        type="button"
+                        aria-label="Close module"
+                    >
+                        ×
+                    </button>
+
+                </div>
+
+
+                <div
+                    id="moduleContent"
+                    class="module-content"
+                >
+                    <div class="module-loading">
+                        INITIALIZING...
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- =================================================
+             NOTIFICATION
+             ================================================= -->
+
+        <div
+            id="notification"
+            class="notification"
+            aria-live="polite"
+        >
+            <span id="notificationText">
+                JARVISH READY
+            </span>
+        </div>
+
+
+        <!-- =================================================
+             VOICE COMMAND INDICATOR
+             ================================================= -->
+
+        <div
+            id="listeningIndicator"
+            class="listening-indicator"
+        >
+
+            <div class="listening-wave">
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+
+            <div>
+                LISTENING...
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- =====================================================
+         JAVASCRIPT
+         ===================================================== -->
+
+<script src="ai-brain.js"></script>
+<script src="script.js"></script>
+
+</body>
+</html>
